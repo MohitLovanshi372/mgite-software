@@ -1,0 +1,44 @@
+{
+  "assistant_name": "JARVIS",
+  "version": "0.1.0",
+  "theme": "dark",
+  "preferred_language": "multilingual",
+  "default_provider": "gemini",
+  "model": "gemini-2.5-flash",
+  "temperature": 0.7,
+  "max_context_messages": 20,
+  "ai_timeout_ms": 25000,
+  "offline_mode": false,
+  "memory": {
+    "enabled": true,
+    "default_sensitivity": "NORMAL",
+    "retention_days": 90
+  },
+  "security": {
+    "redact_sensitive_inputs": true,
+    "strict_tool_allowlist": true,
+    "max_prompt_chars": 8000
+  },
+  "proactive": {
+    "enabled": true,
+    "cooldown_minutes": 15,
+    "quiet_hours_enabled": true,
+    "quiet_hours_start": "22:00",
+    "quiet_hours_end": "07:00"
+  },
+  "modules": {
+    "orchestrator": { "status": "active", "phase": 1 },
+    "ai_service": { "status": "active", "phase": 1 },
+    "sqlite_memory": { "status": "active", "phase": 1 },
+    "security_validator": { "status": "active", "phase": 1 },
+    "structured_logger": { "status": "active", "phase": 1 },
+    "voice_engine": { "status": "placeholder", "phase": 2 },
+    "notification_engine": { "status": "placeholder", "phase": 2 },
+    "otp_privacy_engine": { "status": "active", "phase": 2 },
+    "task_engine": { "status": "placeholder", "phase": 2 },
+    "computer_control": { "status": "placeholder", "phase": 2 },
+    "android_companion": { "status": "placeholder", "phase": 2 },
+    "web_research": { "status": "placeholder", "phase": 2 },
+    "multi_ai_router": { "status": "active", "phase": 2 }
+  }
+}
