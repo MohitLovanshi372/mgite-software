@@ -14,6 +14,8 @@ import { PrivacyFilter } from '../core/security/privacyFilter.ts';
 import { IntentDetector } from '../core/intent/intentDetector.ts';
 import { ProactivePolicy } from '../core/intent/proactivePolicy.ts';
 import { ProactiveEvent } from '../core/intent/types.ts';
+import { voiceEngine } from '../core/voice/voiceEngine.ts';
+import { notificationEngine } from '../core/notifications/notificationEngine.ts';
 
 export const apiRouter = express();
 
@@ -253,4 +255,129 @@ apiRouter.post('/api/proactive/evaluate', (req: Request, res: Response) => {
   const decision = ProactivePolicy.evaluateEvent(event);
   res.json(decision);
 });
+
+// 10. Voice Engine Endpoints (Phase 3 Voice Engine & ElevenLabs TTS Router)
+apiRouter.get('/api/voice/status', async (_req: Request, res: Response) => {
+  try {
+    const config = getConfig().voice;
+    const state = voiceEngine.getState();
+    const permissionState = voiceEngine.getPermissionState();
+    const session = voiceEngine.getCurrentSession();
+    const voices = await voiceEngine.getAvailableVoices();
+    const ttsRouter = voiceEngine.getTTSRouter();
+    const isElevenLabsConfigured = Boolean(process.env.ELEVENLABS_API_KEY);
+
+    res.json({
+      enabled: config.enabled,
+      state,
+      permissionState,
+      autoSpeak: config.auto_speak,
+      preferredLanguage: config.preferred_language,
+      voiceId: config.voice_id,
+      speechRate: config.speech_rate,
+      speechVolume: config.speech_volume,
+      interruptSpeech: config.interrupt_speech,
+      ttsProvider: config.tts_provider || 'elevenlabs',
+      elevenlabsModel: config.elevenlabs_model || 'eleven_multilingual_v2',
+      elevenlabsConfigured: isElevenLabsConfigured, // Boolean only - ELEVENLABS_API_KEY is NEVER exposed
+      availableVoices: voices,
+      activeSessionId: session?.id || null,
+      lastDispatchResult: ttsRouter?.getLastDispatchResult() || null,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+apiRouter.post('/api/voice/config', (req: Request, res: Response) => {
+  try {
+    const updated = voiceEngine.updateVoiceConfig(req.body);
+    const ttsRouter = voiceEngine.getTTSRouter();
+    if (ttsRouter) {
+      if (req.body.tts_provider) ttsRouter.setProvider(req.body.tts_provider);
+      if (req.body.voice_id) ttsRouter.setVoice(req.body.voice_id);
+      if (req.body.speech_rate) ttsRouter.setRate(req.body.speech_rate);
+      if (req.body.speech_volume) ttsRouter.setVolume(req.body.speech_volume);
+    }
+    logger.info('VoiceAPI', 'Voice configuration updated.');
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+apiRouter.post('/api/voice/speak', async (req: Request, res: Response) => {
+  try {
+    const { text, voice_id, rate, volume, lang, provider } = req.body;
+    if (!text || typeof text !== 'string') {
+      res.status(400).json({ error: 'Text is required for TTS synthesis.' });
+      return;
+    }
+
+    const ttsRouter = voiceEngine.getTTSRouter();
+    if (ttsRouter && provider) {
+      ttsRouter.setProvider(provider);
+    }
+
+    const result = await voiceEngine.speak(text, {
+      voiceId: voice_id,
+      rate,
+      volume,
+      lang,
+    });
+
+    const lastDispatch = ttsRouter?.getLastDispatchResult();
+
+    res.json({
+      ...result,
+      dispatch: lastDispatch || null,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+apiRouter.post('/api/voice/stop', (_req: Request, res: Response) => {
+  voiceEngine.stopSpeaking();
+  voiceEngine.stopListening();
+  res.json({ success: true, state: voiceEngine.getState() });
+});
+
+// ==========================================
+// Phase 4: Notification Intelligence & Privacy Shield Endpoints
+// ==========================================
+
+apiRouter.post('/api/notifications/process', async (req: Request, res: Response) => {
+  try {
+    const payload = req.body;
+    const result = await notificationEngine.processNotification(payload);
+    res.json(result);
+  } catch (err: any) {
+    logger.error('NotificationAPI', `Failed to process notification: ${err.message}`);
+    res.status(500).json({ error: 'Internal notification error' });
+  }
+});
+
+apiRouter.get('/api/notifications/status', (_req: Request, res: Response) => {
+  try {
+    res.json({
+      config: notificationEngine.getConfig(),
+      telemetry: notificationEngine.telemetry,
+      safeAuditLogs: notificationEngine.getSafeAuditLogs(),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+apiRouter.post('/api/notifications/config', (req: Request, res: Response) => {
+  try {
+    const updated = notificationEngine.updateConfig(req.body);
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 

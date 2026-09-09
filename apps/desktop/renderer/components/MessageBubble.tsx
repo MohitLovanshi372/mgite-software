@@ -5,15 +5,22 @@
  */
 
 import React, { useState } from 'react';
-import { Bot, User, AlertTriangle, Check, Copy, WifiOff, Sparkles, RefreshCw } from 'lucide-react';
+import { Bot, User, AlertTriangle, Check, Copy, WifiOff, Sparkles, RefreshCw, Volume2 } from 'lucide-react';
 import { ChatMessage } from '../types/index.ts';
 
 interface MessageBubbleProps {
   message: ChatMessage;
   onRetry?: () => void;
+  onSpeak?: (text: string) => void;
+  isSpeakingThisMessage?: boolean;
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({
+  message,
+  onRetry,
+  onSpeak,
+  isSpeakingThisMessage,
+}) => {
   const [copied, setCopied] = useState(false);
   const isAssistant = message.sender === 'assistant';
   const isSystem = message.sender === 'system';
@@ -94,13 +101,26 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }
               )}
             </div>
 
-            <button
-              onClick={handleCopy}
-              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-slate-400 hover:text-slate-200 rounded hover:bg-slate-800"
-              title="Copy message"
-            >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-            </button>
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {onSpeak && !isFailed && message.content && (
+                <button
+                  onClick={() => onSpeak(message.content)}
+                  className={`p-1 rounded hover:bg-slate-800 transition-colors ${
+                    isSpeakingThisMessage ? 'text-cyan-400 animate-pulse' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Read aloud (TTS)"
+                >
+                  <Volume2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+              <button
+                onClick={handleCopy}
+                className="p-1 text-slate-400 hover:text-slate-200 rounded hover:bg-slate-800 transition-colors"
+                title="Copy message"
+              >
+                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              </button>
+            </div>
           </div>
         )}
 

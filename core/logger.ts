@@ -23,14 +23,27 @@ export interface LogEntry {
 class SystemLogger {
   private inMemoryLogs: LogEntry[] = [];
   private maxLogs: number = 500;
-  private logFilePath: string;
+  private logFilePath: string | null = null;
 
   constructor() {
-    const logsDir = path.resolve(process.cwd(), 'logs');
-    if (!fs.existsSync(logsDir)) {
-      fs.mkdirSync(logsDir, { recursive: true });
+    try {
+      if (
+        typeof process !== 'undefined' &&
+        process.cwd &&
+        typeof path !== 'undefined' &&
+        path?.resolve &&
+        typeof fs !== 'undefined' &&
+        fs?.existsSync
+      ) {
+        const logsDir = path.resolve(process.cwd(), 'logs');
+        if (!fs.existsSync(logsDir)) {
+          fs.mkdirSync(logsDir, { recursive: true });
+        }
+        this.logFilePath = path.join(logsDir, 'assistant.log');
+      }
+    } catch {
+      this.logFilePath = null;
     }
-    this.logFilePath = path.join(logsDir, 'assistant.log');
   }
 
   private write(level: LogLevel, module: string, rawMessage: string, details?: Record<string, any>): LogEntry {
@@ -55,17 +68,20 @@ class SystemLogger {
     }
 
     // Append to file asynchronously (safely ignoring errors in read-only setups)
-    try {
-      const line = `[${entry.timestamp}] [${level}] [${module}] ${cleanMsg} ${
-        sanitizedDetails ? JSON.stringify(sanitizedDetails) : ''
-      }\n`;
-      fs.appendFileSync(this.logFilePath, line, 'utf8');
-    } catch {
-      // Ignore disk logging error gracefully
+    if (this.logFilePath && typeof fs !== 'undefined' && fs?.appendFileSync) {
+      try {
+        const line = `[${entry.timestamp}] [${level}] [${module}] ${cleanMsg} ${
+          sanitizedDetails ? JSON.stringify(sanitizedDetails) : ''
+        }\n`;
+        fs.appendFileSync(this.logFilePath, line, 'utf8');
+      } catch {
+        // Ignore disk logging error gracefully
+      }
     }
 
     // Console output for developer visibility
-    if (process.env.NODE_ENV !== 'test') {
+    const isTest = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test';
+    if (!isTest) {
       const prefix = `[${entry.timestamp}] [${level}] [${module}]`;
       if (level === 'ERROR') console.error(prefix, cleanMsg);
       else if (level === 'WARN') console.warn(prefix, cleanMsg);

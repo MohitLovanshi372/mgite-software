@@ -38,13 +38,13 @@ export class RiskClassifier {
     }
 
     if (
-      /(delete\s+all|wipe\s+|format\s+disk|drop\s+database|destroy|erase\s+all|saara\s+data\s+delete|data\s+uda\s+do)/i.test(
+      /(delete\s+all|wipe\s+|format\s+disk|drop\s+database|destroy|erase\s+all|saara\s+data\s+delete|data\s+uda\s+do|rm\s+-rf|powershell|terminal|bash|shell\s+command|exec\s+command|run\s+command)/i.test(
         lower
       )
     ) {
       return {
         riskLevel: 'HIGH',
-        reason: 'Destructive system/data deletion command detected',
+        reason: 'Destructive system/data deletion command or arbitrary shell execution detected',
       };
     }
 

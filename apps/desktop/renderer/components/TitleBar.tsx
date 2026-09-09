@@ -17,12 +17,16 @@ import {
   Minus,
   Square,
   X,
+  User,
+  LayoutDashboard,
 } from 'lucide-react';
 
 interface TitleBarProps {
   assistantName: string;
   isOnline: boolean;
   manualOfflineMode: boolean;
+  viewMode?: 'command_center' | 'workspace';
+  onToggleViewMode?: () => void;
   onToggleOffline: () => void;
   onOpenSettings: () => void;
   onOpenMemory: () => void;
@@ -34,6 +38,8 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   assistantName,
   isOnline,
   manualOfflineMode,
+  viewMode = 'command_center',
+  onToggleViewMode,
   onToggleOffline,
   onOpenSettings,
   onOpenMemory,
@@ -111,6 +117,35 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 
       {/* Right: Quick Tool Buttons */}
       <div className="flex items-center gap-1">
+        {onToggleViewMode && (
+          <button
+            id="btn-nav-viewmode"
+            onClick={onToggleViewMode}
+            className={`px-2.5 py-1 rounded-md transition-colors text-xs flex items-center gap-1.5 cursor-pointer font-medium border ${
+              viewMode === 'command_center'
+                ? 'bg-cyan-950/60 text-cyan-300 border-cyan-800 hover:bg-cyan-900/60'
+                : 'bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800'
+            }`}
+            title={
+              viewMode === 'command_center'
+                ? 'Switch to Detailed Multi-Panel Chat Workspace'
+                : 'Switch to 3D Avatar Command Center'
+            }
+          >
+            {viewMode === 'command_center' ? (
+              <>
+                <User className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="text-[11px]">Command Center</span>
+              </>
+            ) : (
+              <>
+                <LayoutDashboard className="w-3.5 h-3.5 text-slate-400" />
+                <span className="text-[11px]">Workspace</span>
+              </>
+            )}
+          </button>
+        )}
+
         <button
           id="btn-nav-memory"
           onClick={onOpenMemory}

@@ -5,10 +5,11 @@
  */
 
 import React, { useRef, useEffect } from 'react';
-import { Plus, Trash2, MessageSquare, Sparkles, Shield, Trash } from 'lucide-react';
+import { Plus, Trash2, MessageSquare, Sparkles, Shield, Trash, Mic } from 'lucide-react';
 import { ChatMessage, Conversation } from '../types/index.ts';
 import { MessageBubble } from './MessageBubble.tsx';
 import { MessageInput } from './MessageInput.tsx';
+import { useVoiceEngine } from '../hooks/useVoiceEngine.ts';
 
 interface ChatInterfaceProps {
   conversations: Conversation[];
@@ -38,6 +39,42 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onSendMessage,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const lastAssistantSpokenId = useRef<string | null>(null);
+
+  const {
+    voiceState,
+    isListening,
+    isSpeaking,
+    interimTranscript,
+    errorMessage: voiceError,
+    voiceConfig,
+    startListening,
+    stopListening,
+    speak,
+    stopSpeaking,
+  } = useVoiceEngine({
+    onTranscriptComplete: (transcript) => {
+      if (transcript.trim()) {
+        onSendMessage(transcript.trim());
+      }
+    },
+  });
+
+  // Auto-speak response if enabled in settings
+  useEffect(() => {
+    if (voiceConfig.autoSpeak && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      if (
+        lastMsg.sender === 'assistant' &&
+        lastMsg.state === 'COMPLETED' &&
+        lastMsg.content &&
+        lastAssistantSpokenId.current !== lastMsg.id
+      ) {
+        lastAssistantSpokenId.current = lastMsg.id;
+        speak(lastMsg.content);
+      }
+    }
+  }, [messages, voiceConfig.autoSpeak, speak]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -126,10 +163,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         {/* Sidebar Footer info */}
         <div className="p-3 border-t border-slate-800/80 text-[11px] text-slate-500 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <Shield className="w-3.5 h-3.5 text-cyan-400" />
-            <span>SQLite Local Storage</span>
+            <Mic className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Voice & SQLite Local</span>
           </div>
-          <span className="text-[10px] text-slate-400 font-mono">Phase 2</span>
+          <span className="text-[10px] text-cyan-400 font-mono">Phase 3</span>
         </div>
       </aside>
 
@@ -146,7 +183,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   Personal AI Assistant
                 </h1>
                 <p className="text-sm text-slate-400 mb-6 leading-relaxed">
-                  Phase 2 AI Brain with natural conversation in Hindi, Hinglish, and English.
+                  Phase 3 Voice-capable AI Brain with natural conversation in Hindi, Hinglish, and English.
                   Protected by deterministic Privacy Shield & Local SQLite Memory.
                 </p>
 
@@ -174,6 +211,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   key={msg.id}
                   message={msg}
                   onRetry={msg.state === 'FAILED' ? onRetryMessage : undefined}
+                  onSpeak={speak}
+                  isSpeakingThisMessage={isSpeaking}
                 />
               ))
             )}
@@ -182,9 +221,18 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
         {/* Input area */}
         <MessageInput
-          onSendMessage={onSendMessage}
+          onSendMessage={(text) => {
+            stopSpeaking();
+            onSendMessage(text);
+          }}
           isLoading={isLoading}
           isOffline={!isOnline}
+          isListening={isListening}
+          isSpeaking={isSpeaking}
+          interimTranscript={interimTranscript}
+          onToggleVoice={isListening ? stopListening : startListening}
+          onStopSpeaking={stopSpeaking}
+          voiceErrorMessage={voiceError}
         />
       </main>
     </div>

@@ -26,6 +26,9 @@ const OTP_CONTEXT_KEYWORDS = [
   'confirmation code',
   '2fa code',
   'two-factor code',
+  'access code',
+  'passcode',
+  'pin code',
   'satyapan code', // Hindi/Hinglish
   'aapka otp',
   'apna otp',
@@ -147,7 +150,7 @@ export class SensitiveDataDetector {
 
     // Standard pattern: "Your OTP is 483921", "OTP: 829104", "verification code is 123456", "Aapka OTP 849201 hai"
     const standardOtpRegex =
-      /\b(?:otp|one[- ]time[- ]password|verification\s*code|auth\s*code|login\s*code|satyapan\s*code)\b(?:\s+(?:is|hai)\s+|[:\s=-])*([0-9]{4,8})\b/gi;
+      /\b(?:otp|one[- ]time[- ]password|verification\s*code|auth\s*code|login\s*code|access\s*code|passcode|satyapan\s*code)\b(?:\s+(?:is|hai)\s+|[:\s=-])*([0-9]{4,8})\b/gi;
     let match: RegExpExecArray | null;
     while ((match = standardOtpRegex.exec(text)) !== null) {
       if (matches.some((m) => Math.max(m.index, match!.index) < Math.min(m.index + m.length, match!.index + match![0].length))) {
@@ -165,7 +168,7 @@ export class SensitiveDataDetector {
 
     // Reverse pattern: "483921 is your OTP", "829104 aapka verification code hai"
     const reverseOtpRegex =
-      /\b([0-9]{4,8})\s+(?:is\s+(?:your\s+)?(?:otp|verification|login|auth)\s+code|(?:aapka\s+)?(?:otp|satyapan\s+code)\s+hai)\b/gi;
+      /\b([0-9]{4,8})\s+(?:is\s+(?:your\s+)?(?:otp|verification|login|auth|access)\s+code|(?:aapka\s+)?(?:otp|satyapan\s+code)\s+hai)\b/gi;
     while ((match = reverseOtpRegex.exec(text)) !== null) {
       if (matches.some((m) => Math.max(m.index, match!.index) < Math.min(m.index + m.length, match!.index + match![0].length))) {
         continue;
@@ -222,16 +225,17 @@ export class SensitiveDataDetector {
   }
 
   /**
-   * Detects banking security codes and payment authorization codes.
+   * Detects banking security codes, authentication codes, and payment authorization codes.
    */
   private static detectBankingAndSecurityCodes(text: string, matches: DetectionMatch[]): void {
+    let match: RegExpExecArray | null;
+
     // Banking security code: "banking security code is 994821", "bank security code: 123456"
     const bankingCodeRegex =
       /\b(?:banking\s*security\s*code|bank\s*security\s*code)\b(?:\s+(?:is|hai)\s+|[:\s=-])*([0-9A-Za-z]{4,10})\b/gi;
-    let match: RegExpExecArray | null;
     while ((match = bankingCodeRegex.exec(text)) !== null) {
       matches.push({
-        type: 'BANKING_SECURITY_CODE',
+        type: 'SECURITY_CODE',
         category: 'SECURITY_CODE',
         value: match[1],
         index: match.index,
@@ -240,18 +244,52 @@ export class SensitiveDataDetector {
       });
     }
 
-    // Payment authorization code: "payment authorization code: 883920", "payment auth code is 773912"
+    // Explicit Security Code: "security code: 483921", "security code is 99201"
+    const generalSecurityCodeRegex =
+      /\b(?:security\s*code)\b(?:\s+(?:is|hai)\s+|[:\s=-])*([0-9A-Za-z]{4,10})\b/gi;
+    while ((match = generalSecurityCodeRegex.exec(text)) !== null) {
+      if (!matches.some((m) => m.index === match!.index)) {
+        matches.push({
+          type: 'SECURITY_CODE',
+          category: 'SECURITY_CODE',
+          value: match[1],
+          index: match.index,
+          length: match[0].length,
+          confidence: 0.98,
+        });
+      }
+    }
+
+    // Authentication code: "authentication code: 883920", "auth code is 773912"
+    const authCodeRegex =
+      /\b(?:authentication\s*code|auth\s*code)\b(?:\s+(?:is|hai)\s+|[:\s=-])*([0-9A-Za-z]{4,10})\b/gi;
+    while ((match = authCodeRegex.exec(text)) !== null) {
+      if (!matches.some((m) => m.index === match!.index)) {
+        matches.push({
+          type: 'AUTHENTICATION_CODE',
+          category: 'SECURITY_CODE',
+          value: match[1],
+          index: match.index,
+          length: match[0].length,
+          confidence: 0.98,
+        });
+      }
+    }
+
+    // Payment authorization code: "payment authorization code: 883920", "payment authorization is 773912"
     const paymentAuthRegex =
-      /\b(?:payment\s*(?:authorization|auth)\s*code)\b(?:\s+(?:is|hai)\s+|[:\s=-])*([0-9A-Za-z]{4,10})\b/gi;
+      /\b(?:payment\s*(?:authorization|auth)(?:\s*code)?)\b(?:\s+(?:is|hai)\s+|[:\s=-])*([0-9A-Za-z]{4,10})\b/gi;
     while ((match = paymentAuthRegex.exec(text)) !== null) {
-      matches.push({
-        type: 'PAYMENT_AUTH_CODE',
-        category: 'SECURITY_CODE',
-        value: match[1],
-        index: match.index,
-        length: match[0].length,
-        confidence: 0.98,
-      });
+      if (!matches.some((m) => m.index === match!.index)) {
+        matches.push({
+          type: 'PAYMENT_AUTHORIZATION',
+          category: 'SECURITY_CODE',
+          value: match[1],
+          index: match.index,
+          length: match[0].length,
+          confidence: 0.98,
+        });
+      }
     }
   }
 
@@ -323,10 +361,14 @@ export class SensitiveDataDetector {
   private static detectCredentials(text: string, matches: DetectionMatch[]): void {
     let match: RegExpExecArray | null;
 
-    // Passwords: "password is secret123", "password: mypass", "passcode is 8849", "mera password hai ..."
+    // Passwords: "password is secret123", "password: mypass", "passcode is 8849", "mera password secretPass99 hai", "Aapka password secretPass99..."
     const passwordRegex =
-      /(?:password|passcode|master_key|mera\s+password)\s*(?:[:=]|\bis\b|\bhai\b)\s*['"]?([^\s,;]{4,})['"]?/gi;
+      /(?:(?:mera|aapka|apna|user|my|the)?\s*(?:passcode|password|master_key))\s*(?:[:=]|\bis\b|\bhai\b)?\s*['"]?([a-zA-Z0-9!@#$%^&*()_+\-=[\]{};':",./<>?]{4,})['"]?\s*(?:hai|\bis\b)?/gi;
     while ((match = passwordRegex.exec(text)) !== null) {
+      const val = match[1].toLowerCase();
+      if (['reset', 'update', 'bhool', 'batao', 'kya', 'chahiye', 'hoga', 'rakho', 'protect', 'protected'].includes(val)) {
+        continue;
+      }
       matches.push({
         type: 'PASSWORD',
         category: 'CREDENTIAL',
@@ -350,8 +392,8 @@ export class SensitiveDataDetector {
       });
     }
 
-    // OpenAI API Keys: sk-...
-    const openaiKeyRegex = /\bsk-[a-zA-Z0-9]{20,}\b/g;
+    // OpenAI / Generic secret API Keys: sk-...
+    const openaiKeyRegex = /\bsk-[a-zA-Z0-9_\-]{8,}\b/g;
     while ((match = openaiKeyRegex.exec(text)) !== null) {
       matches.push({
         type: 'API_KEY',
@@ -364,7 +406,7 @@ export class SensitiveDataDetector {
     }
 
     // Explicit API Key: "My API key is ABC123XYZ", "API key: ...", "api_key = ..."
-    const genericApiKeyRegex = /(?:api[_\-\s]?key)\s*(?:[:=]|\bis\b|\bhai\b)\s*['"]?([a-zA-Z0-9_\-\.]{6,})['"]?/gi;
+    const genericApiKeyRegex = /(?:api[_\-\s]?key)\s*(?:[:=]|\bis\b|\bhai\b)?\s*['"]?([a-zA-Z0-9_\-\.]{6,})['"]?\s*(?:hai|\bis\b)?/gi;
     while ((match = genericApiKeyRegex.exec(text)) !== null) {
       if (!matches.some((m) => m.index === match!.index)) {
         matches.push({
@@ -378,12 +420,13 @@ export class SensitiveDataDetector {
       }
     }
 
-    // Access Tokens / Secret Keys: "access token is ...", "secret key: ...", "authentication token: ..."
+    // Access Tokens / Secret Keys: "access token is ...", "secret key: ...", "authentication token: ...", "secret key <val> hai"
     const tokenRegex =
-      /(?:access[_\-\s]?token|secret[_\-\s]?key|auth[_\-\s]?token|authentication[_\-\s]?token)\s*(?:[:=]|\bis\b|\bhai\b)\s*['"]?([a-zA-Z0-9_\-\.]{6,})['"]?/gi;
+      /(?:access[_\-\s]?token|secret[_\-\s]?key|auth[_\-\s]?token|authentication[_\-\s]?token)\s*(?:[:=]|\bis\b|\bhai\b)?\s*['"]?([a-zA-Z0-9_\-\.]{6,})['"]?\s*(?:hai|\bis\b)?/gi;
     while ((match = tokenRegex.exec(text)) !== null) {
+      const isSecretKey = /secret[_\-\s]?key/i.test(match[0]);
       matches.push({
-        type: 'ACCESS_TOKEN',
+        type: isSecretKey ? 'SECRET_KEY' : 'ACCESS_TOKEN',
         category: 'CREDENTIAL',
         value: match[1],
         index: match.index,

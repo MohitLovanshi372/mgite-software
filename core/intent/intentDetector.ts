@@ -39,12 +39,14 @@ export class IntentDetector {
 
     // 1. First: Privacy Check (Local, deterministic)
     const privacy = PrivacyFilter.filterInput(text);
-    const hasSensitiveData = privacy.hadSensitiveData || privacy.action === 'BLOCK';
+    const textContainsSecret = /(password|passcode|secret\s*key|cvv|pin|otp|token)\b/i.test(lower);
+    const hasSensitiveData = privacy.hadSensitiveData || privacy.action === 'BLOCK' || textContainsSecret;
     const isOtpOrSecret =
       privacy.classification === 'OTP' ||
       privacy.classification === 'CREDENTIAL' ||
       privacy.classification === 'FINANCIAL' ||
-      privacy.classification === 'SECURITY_CODE';
+      privacy.classification === 'SECURITY_CODE' ||
+      textContainsSecret;
 
     // Extract recent user context snippet if available
     let contextSnippet: string | undefined;
@@ -145,9 +147,9 @@ export class IntentDetector {
       };
     }
 
-    // C. REMINDER REQUEST ("kal mujhe 10 baje yaad dila dena", "subah 8 baje yaad dila dena", "remind me to...", "alarm lagao")
+    // C. REMINDER REQUEST ("kal mujhe 10 baje yaad dila dena", "subah 8 baje yaad dila dena", "remind me to...", "alarm lagao", "reminder laga dena")
     if (
-      /(yaad\s+dila\s+dena|yaad\s+dilana|remind\s+me|reminder\s+set|alarm\s+lagao|alarm\s+set)/i.test(
+      /(yaad\s+dila\s+dena|yaad\s+dilana|yaad\s+dila|remind\s+me|reminder\s*(laga|set|kar|banao|add|create|dena)|\breminder\b|alarm\s*(lagao|set))/i.test(
         lower
       )
     ) {
@@ -171,9 +173,9 @@ export class IntentDetector {
       };
     }
 
-    // D. COMPUTER ACTION REQUEST ("youtube kholo", "open chrome", "youtube par coding video chalao", "paise transfer kar do", "turn on wifi")
+    // D. COMPUTER ACTION REQUEST ("youtube kholo", "open chrome", "youtube par coding video chalao", "paise transfer kar do", "turn on wifi", "run powershell command")
     if (
-      /(kholo|open\s+|chalao|play\s+|turn\s+on|turn\s+off|band\s+karo|volume\s+|screenshot|transfer\s+money|paise\s+transfer|send\s+money)/i.test(
+      /(kholo|open\s+|chalao|play\s+|turn\s+on|turn\s+off|band\s+karo|volume\s+|screenshot|transfer\s+money|paise\s+transfer|send\s+money|powershell|terminal|bash|shell|command|rm\s+-rf|shutdown|reboot|run\s+)/i.test(
         lower
       ) &&
       !/(weather|mausam|news|settings)/i.test(lower)
@@ -181,7 +183,7 @@ export class IntentDetector {
       return {
         intent: 'COMPUTER_ACTION_REQUEST',
         confidence: 0.9,
-        reasoning: 'App launch, playback, device control, or external transaction command',
+        reasoning: 'App launch, playback, device control, or system execution command',
       };
     }
 

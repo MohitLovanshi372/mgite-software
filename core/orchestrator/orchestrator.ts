@@ -25,6 +25,8 @@ import { logger } from '../logger.ts';
 import { getConfig } from '../../config/settings.ts';
 import { IntentDetector } from '../intent/intentDetector.ts';
 import { IntentResult } from '../intent/types.ts';
+import { AvatarInstruction, AvatarEmotion, AvatarGesture, AvatarStateName } from '../ai/types.ts';
+import { AvatarInstructionValidator } from '../avatar/avatarInstruction.ts';
 
 export interface OrchestratorInput {
   message: string;
@@ -42,6 +44,10 @@ export interface OrchestratorOutput {
   warnings?: string[];
   tokensUsed?: number;
   timestamp: string;
+  avatar?: AvatarInstruction;
+  emotion?: AvatarEmotion;
+  gesture?: AvatarGesture;
+  state?: AvatarStateName;
 }
 
 export type OrchestratorStreamEvent =
@@ -55,10 +61,51 @@ export type OrchestratorStreamEvent =
       intent?: IntentResult;
       warnings?: string[];
       timestamp: string;
+      avatar?: AvatarInstruction;
+      emotion?: AvatarEmotion;
+      gesture?: AvatarGesture;
+      state?: AvatarStateName;
     }
   | { type: 'error'; error: string };
 
 export class AssistantOrchestrator {
+  /**
+   * Processes a user chat request with unified parameter object (supporting input_mode and legacy signatures).
+   */
+  public async processUserMessage(options: {
+    conversation_id?: string;
+    user_message: string;
+    input_mode?: 'text' | 'voice';
+    isOfflineMode?: boolean;
+    enforce_offline?: boolean;
+  }): Promise<{
+    conversation_id: string;
+    content: string;
+    intent?: IntentResult;
+    isOffline: boolean;
+    state: 'COMPLETED' | 'ERROR';
+    provider: string;
+    model: string;
+    warnings?: string[];
+  }> {
+    const isOffline = options.enforce_offline ?? options.isOfflineMode;
+    const result = await this.processMessage({
+      message: options.user_message,
+      conversationId: options.conversation_id,
+      isOfflineMode: isOffline,
+    });
+    return {
+      conversation_id: result.conversationId,
+      content: result.response,
+      intent: result.intent,
+      isOffline: result.isOffline,
+      state: 'COMPLETED',
+      provider: result.provider,
+      model: result.model,
+      warnings: result.warnings,
+    };
+  }
+
   /**
    * Processes a user chat request through the full architectural pipeline.
    */
@@ -255,6 +302,11 @@ export class AssistantOrchestrator {
     logger.info('Orchestrator', `Completed response for conversation ${convId}`);
 
     // Step 6: Chat Response
+    const avatarInstruction = AvatarInstructionValidator.generateFromResponse(
+      validation.sanitizedResponse,
+      intentResult.intent
+    );
+
     return {
       conversationId: convId,
       response: validation.sanitizedResponse,
@@ -264,6 +316,10 @@ export class AssistantOrchestrator {
       intent: intentResult,
       warnings: warnings.length > 0 ? warnings : undefined,
       timestamp: new Date().toISOString(),
+      avatar: avatarInstruction,
+      emotion: avatarInstruction.emotion,
+      gesture: avatarInstruction.gesture,
+      state: avatarInstruction.state,
     };
   }
 
@@ -452,6 +508,11 @@ export class AssistantOrchestrator {
     memoryEngine.addMessage(convId, 'assistant', validation.sanitizedResponse);
 
     // Step 6: Final Done Event
+    const avatarInstruction = AvatarInstructionValidator.generateFromResponse(
+      validation.sanitizedResponse,
+      intentResult.intent
+    );
+
     yield {
       type: 'done',
       conversationId: convId,
@@ -461,6 +522,10 @@ export class AssistantOrchestrator {
       intent: intentResult,
       warnings: warnings.length > 0 ? warnings : undefined,
       timestamp: new Date().toISOString(),
+      avatar: avatarInstruction,
+      emotion: avatarInstruction.emotion,
+      gesture: avatarInstruction.gesture,
+      state: avatarInstruction.state,
     };
   }
 }

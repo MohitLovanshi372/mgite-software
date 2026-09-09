@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ChatMessage, Conversation, MessageState } from '../types/index.ts';
 import { apiService } from '../services/api.ts';
+import { avatarController } from '../../../../src/avatar/AvatarController.ts';
 
 export function useAssistant(isOfflineMode: boolean) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -85,6 +86,7 @@ export function useAssistant(isOfflineMode: boolean) {
 
     // Append both messages
     setMessages((prev) => [...prev, tempUserMsg, tempAssistantMsg]);
+    avatarController.setState('THINKING');
 
     try {
       let accumulatedText = '';
@@ -96,6 +98,7 @@ export function useAssistant(isOfflineMode: boolean) {
         isOfflineMode,
         (token) => {
           accumulatedText += token;
+          avatarController.setState('SPEAKING');
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === tempAssistantMsgId
@@ -105,6 +108,13 @@ export function useAssistant(isOfflineMode: boolean) {
           );
         },
         (meta) => {
+          avatarController.handleAIResponse({
+            text: accumulatedText,
+            emotion: meta.emotion,
+            gesture: meta.gesture,
+            state: meta.state,
+            avatar: meta.avatar,
+          });
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === tempAssistantMsgId
@@ -143,6 +153,14 @@ export function useAssistant(isOfflineMode: boolean) {
           isOfflineMode
         );
 
+        avatarController.handleAIResponse({
+          text: fallbackResult.response,
+          emotion: fallbackResult.emotion,
+          gesture: fallbackResult.gesture,
+          state: fallbackResult.state,
+          avatar: fallbackResult.avatar,
+        });
+
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === tempAssistantMsgId
@@ -167,6 +185,7 @@ export function useAssistant(isOfflineMode: boolean) {
         }
         setMessageState('COMPLETED');
       } catch (unaryErr: any) {
+        avatarController.setState('ERROR');
         const friendlyError = 'Response nahi aa paya. Retry karo.';
         setErrorMessage(unaryErr.message || friendlyError);
         setMessageState('FAILED');

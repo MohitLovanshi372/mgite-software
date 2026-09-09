@@ -132,4 +132,22 @@ export class PrivacyFilter {
   public static evaluate(input: string): PrivacyFilterResult {
     return this.filterInput(input);
   }
+
+  /**
+   * Convenience filter method returning standard flags and findings.
+   */
+  public static filter(input: string): {
+    blocked: boolean;
+    redactedText: string;
+    findings: Array<{ type: string; value: string }>;
+    result: PrivacyFilterResult;
+  } {
+    const res = this.filterInput(input);
+    return {
+      blocked: res.action === 'BLOCK',
+      redactedText: res.safeContent || res.cleanText,
+      findings: res.detectedTypes.map((t) => ({ type: t, value: '' })),
+      result: res,
+    };
+  }
 }

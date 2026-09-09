@@ -1,6 +1,6 @@
 {
   "name": "Personal AI Assistant",
-  "description": "A privacy-first, local-first personal AI assistant with modular orchestrator, SQLite memory foundation, and Gemini AI service.",
-  "requestFramePermissions": [],
+  "description": "A privacy-first, local-first personal AI assistant with modular orchestrator, SQLite memory foundation, Voice Engine, and Notification Intelligence Privacy Shield.",
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

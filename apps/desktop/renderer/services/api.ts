@@ -48,6 +48,10 @@ export const apiService = {
     model: string;
     isOffline: boolean;
     intent?: any;
+    avatar?: any;
+    emotion?: any;
+    gesture?: any;
+    state?: any;
     warnings?: string[];
     timestamp: string;
   }> {
@@ -58,6 +62,10 @@ export const apiService = {
       model: string;
       isOffline: boolean;
       intent?: any;
+      avatar?: any;
+      emotion?: any;
+      gesture?: any;
+      state?: any;
       warnings?: string[];
       timestamp: string;
     }>(`${BASE_URL}/api/chat`, {
@@ -197,6 +205,55 @@ export const apiService = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(partial),
+    });
+  },
+
+  async getVoiceStatus(): Promise<any> {
+    return fetchJson<any>(`${BASE_URL}/api/voice/status`);
+  },
+
+  async updateVoiceConfig(config: any): Promise<any> {
+    return fetchJson<any>(`${BASE_URL}/api/voice/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    });
+  },
+
+  async speakText(text: string, options?: any): Promise<{ success: boolean; message?: string }> {
+    return fetchJson<{ success: boolean; message?: string }>(`${BASE_URL}/api/voice/speak`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, ...options }),
+    });
+  },
+
+  async stopVoice(): Promise<void> {
+    await fetch(`${BASE_URL}/api/voice/stop`, { method: 'POST' }).catch(() => {});
+  },
+
+  async processNotification(payload: {
+    appName?: string;
+    title?: string;
+    content?: string;
+    sender?: string;
+  }): Promise<any> {
+    return fetchJson<any>(`${BASE_URL}/api/notifications/process`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getNotificationStatus(): Promise<any> {
+    return fetchJson<any>(`${BASE_URL}/api/notifications/status`);
+  },
+
+  async updateNotificationConfig(config: any): Promise<any> {
+    return fetchJson<any>(`${BASE_URL}/api/notifications/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
     });
   },
 };

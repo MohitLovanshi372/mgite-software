@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { TitleBar } from '../apps/desktop/renderer/components/TitleBar.tsx';
 import { ChatInterface } from '../apps/desktop/renderer/components/ChatInterface.tsx';
+import { CommandCenter } from '../apps/desktop/renderer/components/CommandCenter.tsx';
 import { SettingsModal } from '../apps/desktop/renderer/components/SettingsModal.tsx';
 import { MemoryInspector } from '../apps/desktop/renderer/components/MemoryInspector.tsx';
 import { LogsViewer } from '../apps/desktop/renderer/components/LogsViewer.tsx';
@@ -41,10 +42,16 @@ export default function App() {
   } = useAssistant(!isOnline);
 
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
+  const [viewMode, setViewMode] = useState<'command_center' | 'workspace'>('command_center');
   const [showSettings, setShowSettings] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [showArchitecture, setShowArchitecture] = useState(false);
+
+  // Compute the last assistant message content for the avatar speech bubble
+  const lastAssistantMsg = [...messages]
+    .reverse()
+    .find((m) => m.sender === 'assistant' && m.content?.trim())?.content;
 
   const loadStatus = async () => {
     try {
@@ -68,6 +75,10 @@ export default function App() {
         assistantName={systemStatus?.assistant_name || 'JARVIS'}
         isOnline={isOnline}
         manualOfflineMode={manualOfflineMode}
+        viewMode={viewMode}
+        onToggleViewMode={() =>
+          setViewMode((prev) => (prev === 'command_center' ? 'workspace' : 'command_center'))
+        }
         onToggleOffline={toggleManualOffline}
         onOpenSettings={() => setShowSettings(true)}
         onOpenMemory={() => setShowMemory(true)}
@@ -108,20 +119,36 @@ export default function App() {
         </div>
       )}
 
-      {/* 4. Chat Interface Center */}
-      <ChatInterface
-        conversations={conversations}
-        activeConversationId={activeConversationId}
-        messages={messages}
-        isLoading={isLoading}
-        isOnline={isOnline}
-        onSelectConversation={(id) => setActiveConversationId(id)}
-        onNewConversation={startNewConversation}
-        onDeleteConversation={deleteConversation}
-        onClearAllHistory={clearAllHistory}
-        onRetryMessage={retryLastMessage}
-        onSendMessage={sendMessage}
-      />
+      {/* 4. Active Main View: 3D Command Center OR Detailed Workspace */}
+      <div className="flex-1 overflow-hidden relative">
+        {viewMode === 'command_center' ? (
+          <CommandCenter
+            assistantName={systemStatus?.assistant_name || 'JARVIS'}
+            isOnline={isOnline}
+            isLoading={isLoading}
+            lastAssistantMessage={lastAssistantMsg}
+            onSendMessage={sendMessage}
+            onOpenChat={() => setViewMode('workspace')}
+            onOpenTasks={() => setShowArchitecture(true)}
+            onOpenMemory={() => setShowMemory(true)}
+            onOpenSettings={() => setShowSettings(true)}
+          />
+        ) : (
+          <ChatInterface
+            conversations={conversations}
+            activeConversationId={activeConversationId}
+            messages={messages}
+            isLoading={isLoading}
+            isOnline={isOnline}
+            onSelectConversation={(id) => setActiveConversationId(id)}
+            onNewConversation={startNewConversation}
+            onDeleteConversation={deleteConversation}
+            onClearAllHistory={clearAllHistory}
+            onRetryMessage={retryLastMessage}
+            onSendMessage={sendMessage}
+          />
+        )}
+      </div>
 
       {/* 5. Modals & Drawers */}
       <SettingsModal

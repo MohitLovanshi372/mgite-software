@@ -19,6 +19,9 @@ import { runGeminiProviderUnitTests } from './gemini_provider.unit.test.ts';
 import { runStep4PrivacyTests } from './step4_privacy_filter.test.ts';
 import { runStep5MemoryTests } from './step5_memory_engine.test.ts';
 import { runStep6IntentAndProactiveTests } from './step6_intent_and_proactive.test.ts';
+import { runPhase3VoiceEngineTests } from './phase3_voice_engine.test.ts';
+import { runElevenLabsVoiceTests } from './phase3_elevenlabs_tts.test.ts';
+import { runPhase4NotificationTests } from './phase4_notification_intelligence.test.ts';
 
 async function main() {
   console.log('========================================');
@@ -47,8 +50,14 @@ async function main() {
     await runStep5MemoryTests();
     console.log('');
     await runStep6IntentAndProactiveTests();
+    console.log('');
+    await runPhase3VoiceEngineTests();
+    console.log('');
+    await runElevenLabsVoiceTests();
+    console.log('');
+    await runPhase4NotificationTests();
     console.log('\n========================================');
-    console.log('ALL AUTOMATED TESTS (PHASE 1 & PHASE 2 STEPS 1-6) PASSED (100%)');
+    console.log('ALL AUTOMATED TESTS (PHASE 1-3 ELEVENLABS & PHASE 4 NOTIFICATION INTELLIGENCE) PASSED (100%)');
     console.log('========================================');
   } catch (error) {
     console.error('\n❌ Test execution failed:', error);

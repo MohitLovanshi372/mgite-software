@@ -95,6 +95,7 @@ export interface AppConfig {
   preferred_language: string;
   default_provider: string;
   model: string;
+  max_context_messages?: number;
   temperature: number;
   offline_mode: boolean;
   memory: {
@@ -106,6 +107,29 @@ export interface AppConfig {
     redact_sensitive_inputs: boolean;
     strict_tool_allowlist: boolean;
     max_prompt_chars: number;
+  };
+  voice?: {
+    enabled: boolean;
+    auto_speak: boolean;
+    preferred_language: string;
+    voice_id: string;
+    speech_rate: number;
+    speech_volume: number;
+    interrupt_speech: boolean;
+    stt_provider: string;
+    tts_provider: string;
+  };
+  notification?: {
+    enabled: boolean;
+    read_important_notifications: boolean;
+    read_normal_notifications: boolean;
+    sensitive_notifications_enabled: false;
+    priority_apps: string[];
+    priority_contacts: string[];
+    quiet_hours_enabled: boolean;
+    quiet_hours_start: string;
+    quiet_hours_end: string;
+    cooldown_seconds: number;
   };
   modules: Record<string, { status: 'active' | 'placeholder'; phase: number }>;
 }

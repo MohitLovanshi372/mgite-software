@@ -44,6 +44,48 @@ export interface AIRequest {
   metadata?: Record<string, unknown>;
 }
 
+export type AvatarEmotion =
+  | 'neutral'
+  | 'friendly'
+  | 'happy'
+  | 'thinking'
+  | 'confused'
+  | 'serious'
+  | 'surprised'
+  | 'excited'
+  | 'concerned'
+  | 'sad';
+
+export type AvatarGesture =
+  | 'nod'
+  | 'tilt'
+  | 'wave'
+  | 'hand_open'
+  | 'thinking'
+  | 'welcome'
+  | 'acknowledgement'
+  | 'none';
+
+export type AvatarStateName =
+  | 'IDLE'
+  | 'LISTENING'
+  | 'THINKING'
+  | 'SPEAKING'
+  | 'HAPPY'
+  | 'SAD'
+  | 'SURPRISED'
+  | 'CONFUSED'
+  | 'SERIOUS'
+  | 'EXCITED'
+  | 'ERROR';
+
+export interface AvatarInstruction {
+  emotion: AvatarEmotion;
+  gesture: AvatarGesture;
+  speaking: boolean;
+  state: AvatarStateName;
+}
+
 export interface AIResponse {
   text: string;
   provider: string;
@@ -53,6 +95,11 @@ export interface AIResponse {
   isOffline?: boolean;
   warnings?: string[];
   toolRequests?: FutureToolRequest[];
+  emotion?: AvatarEmotion;
+  gesture?: AvatarGesture;
+  speaking?: boolean;
+  state?: AvatarStateName;
+  avatar?: AvatarInstruction;
 }
 
 export interface AIStreamChunk {
