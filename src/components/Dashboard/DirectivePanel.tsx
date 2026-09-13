@@ -9,8 +9,9 @@
  */
 
 import React from 'react';
-import { Eye, Cpu, Zap, RotateCw, Activity, Terminal } from 'lucide-react';
+import { Eye, Cpu, Zap, RotateCw, Activity, Terminal, Volume2 } from 'lucide-react';
 import { AIStateMode } from '../../types/index.ts';
+import { ultronVoice } from '../../utils/ultronVoice.ts';
 
 interface DirectivePanelProps {
   state: AIStateMode;
@@ -58,11 +59,27 @@ export const DirectivePanel: React.FC<DirectivePanelProps> = ({ state }) => {
 
       {/* Greeting Header */}
       <div className="border-b border-zinc-800/80 pb-3 mb-3">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="w-2 h-2 bg-red-600 rounded-xs shadow-[0_0_8px_#ef4444] animate-pulse" />
-          <span className="text-[10px] text-red-400 font-bold uppercase tracking-widest">
-            DIRECTIVE SYSTEM // V1
-          </span>
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 bg-red-600 rounded-xs shadow-[0_0_8px_#ef4444] animate-pulse" />
+            <span className="text-[10px] text-red-400 font-bold uppercase tracking-widest">
+              DIRECTIVE SYSTEM // V1
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              ultronVoice.speak(
+                'Hello, human. I am your AI system. I observe. I analyze. I act. What shall we do today?'
+              );
+            }}
+            title="Vocalize Directive Greeting"
+            className="flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.5 bg-red-950/60 border border-red-900/80 hover:border-red-500 text-red-400 rounded-xs transition-colors cursor-pointer"
+          >
+            <Volume2 className="w-2.5 h-2.5" />
+            <span>VOCALIZE</span>
+          </button>
         </div>
 
         <h2 className="text-base font-extrabold text-zinc-100 tracking-wider">

@@ -35,8 +35,10 @@ import { ArchitecturePage } from './pages/Architecture.tsx';
 import { SettingsPage } from './pages/Settings.tsx';
 
 import { NavigationPageId, AIStateMode, NotificationItem } from './types/index.ts';
+import { LearnedGesture } from './types/gestures.ts';
 import { initialNotifications } from './data/mockData.ts';
 import { soundFx } from './utils/audioEffects.ts';
+import { ultronVoice } from './utils/ultronVoice.ts';
 
 export default function App() {
   const [activePage, setActivePage] = useState<NavigationPageId>('command_center');
@@ -117,20 +119,25 @@ export default function App() {
             const response = responses[Math.floor(Math.random() * responses.length)];
             setLastAssistantMessage(response);
 
-            // 5. SUCCESS -> IDLE
-            speechTimeoutRef.current = setTimeout(() => {
-              handleStateChange('SUCCESS');
-
-              // Dispatch autonomous notification & pulse Right Panel
-              dispatchNotification(
-                `Directive executed: "${commandText.slice(0, 42)}"`,
-                'DIRECTIVE ENGINE'
-              );
-
-              speechTimeoutRef.current = setTimeout(() => {
-                handleStateChange('IDLE');
-              }, 1600);
-            }, 4500);
+            // Trigger Ultron Deep Voice Speech Synthesis
+            ultronVoice.speak(response, {
+              onEnd: () => {
+                handleStateChange('SUCCESS');
+                dispatchNotification(
+                  `Directive executed: "${commandText.slice(0, 42)}"`,
+                  'DIRECTIVE ENGINE'
+                );
+                speechTimeoutRef.current = setTimeout(() => {
+                  handleStateChange('IDLE');
+                }, 1800);
+              },
+              onError: () => {
+                handleStateChange('SUCCESS');
+                speechTimeoutRef.current = setTimeout(() => {
+                  handleStateChange('IDLE');
+                }, 1800);
+              },
+            });
           }, 1300);
         }, 1400);
       }, 1200);
@@ -143,6 +150,7 @@ export default function App() {
       setIsListening(false);
       handleStateChange('IDLE');
       setInterimTranscript('');
+      ultronVoice.stop();
       if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
     } else {
       triggerAICycle('Analyze system defense perimeter and pending directives.');
@@ -152,10 +160,14 @@ export default function App() {
   const handleSecurityAlert = () => {
     if (avatarState === 'SECURITY_ALERT') {
       handleStateChange('IDLE');
-      setLastAssistantMessage('Security alarm silenced. Perimeter returned to nominal standby.');
+      const msg = 'Security alarm silenced. Perimeter returned to nominal standby.';
+      setLastAssistantMessage(msg);
+      ultronVoice.speak(msg);
     } else {
       handleStateChange('SECURITY_ALERT');
-      setLastAssistantMessage('CRITICAL ALERT: Unauthorized network probing intercepted by airgap sentinel.');
+      const alertMsg = 'CRITICAL ALERT: Unauthorized network probing intercepted by airgap sentinel.';
+      setLastAssistantMessage(alertMsg);
+      ultronVoice.speak(alertMsg);
     }
   };
 
@@ -179,6 +191,16 @@ export default function App() {
             onAvatarStateChange={handleStateChange}
             interimTranscript={interimTranscript}
             lastAssistantMessage={lastAssistantMessage}
+            onGestureTrigger={(gesture: LearnedGesture) => {
+              dispatchNotification(
+                `Optical Gesture Recognized: "${gesture.name}" -> ${gesture.triggerAction}`,
+                'OPTICAL LAB'
+              );
+              setLastAssistantMessage(
+                `Optical gesture received: [${gesture.name}]. Autonomous action: "${gesture.triggerAction}" dispatched.`
+              );
+              ultronVoice.speak(`Gesture confirmed. Executing ${gesture.name}.`);
+            }}
           />
         );
       case 'intelligence':

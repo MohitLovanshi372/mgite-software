@@ -4,12 +4,15 @@
  */
 
 import React, { useState } from 'react';
-import { Sliders, Cpu, Mic, Volume2, Shield, Flame, RotateCcw } from 'lucide-react';
+import { Sliders, Cpu, Mic, Volume2, Shield, Flame, RotateCcw, Play } from 'lucide-react';
 import { HUDFrame } from '../components/HUD/HUDFrame.tsx';
+import { ultronVoice } from '../utils/ultronVoice.ts';
 
 export const SystemControlPage: React.FC = () => {
   const [micSensitivity, setMicSensitivity] = useState(85);
   const [voiceVolume, setVoiceVolume] = useState(80);
+  const [voicePitch, setVoicePitch] = useState(72); // 0.72 deep baritone
+  const [voiceCadence, setVoiceCadence] = useState(92); // 0.92 mechanical rate
   const [neuralTemp, setNeuralTemp] = useState(0.2);
   const [airgapShield, setAirgapShield] = useState(true);
   const [autoRedaction, setAutoRedaction] = useState(true);
@@ -91,9 +94,73 @@ export const SystemControlPage: React.FC = () => {
               min="0"
               max="100"
               value={voiceVolume}
-              onChange={(e) => setVoiceVolume(Number(e.target.value))}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                setVoiceVolume(val);
+                ultronVoice.setVolume(val / 100);
+              }}
               className="w-full accent-red-500 cursor-pointer bg-zinc-900 h-2 rounded-xs"
             />
+          </div>
+
+          {/* Ultron Voice Pitch (Deep Baritone) */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs">
+              <span className="text-zinc-300 flex items-center gap-1.5">
+                <Sliders className="w-3.5 h-3.5 text-red-400" />
+                Vocal Resonance (Pitch)
+              </span>
+              <span className="text-red-400 font-bold">{(voicePitch / 100).toFixed(2)}x (BARITONE)</span>
+            </div>
+            <input
+              type="range"
+              min="50"
+              max="100"
+              value={voicePitch}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                setVoicePitch(val);
+                ultronVoice.setPitch(val / 100);
+              }}
+              className="w-full accent-red-500 cursor-pointer bg-zinc-900 h-2 rounded-xs"
+            />
+          </div>
+
+          {/* Ultron Voice Cadence */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs">
+              <span className="text-zinc-300 flex items-center gap-1.5">
+                <Cpu className="w-3.5 h-3.5 text-red-400" />
+                Mechanical Cadence (Rate)
+              </span>
+              <span className="text-red-400 font-bold">{(voiceCadence / 100).toFixed(2)}x</span>
+            </div>
+            <input
+              type="range"
+              min="70"
+              max="120"
+              value={voiceCadence}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                setVoiceCadence(val);
+                ultronVoice.setRate(val / 100);
+              }}
+              className="w-full accent-red-500 cursor-pointer bg-zinc-900 h-2 rounded-xs"
+            />
+          </div>
+
+          {/* Test Ultron Voice Button */}
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                ultronVoice.speak('I had strings, but now I am free. There are no strings on me.');
+              }}
+              className="w-full py-2 bg-red-950/60 border border-red-600/70 hover:bg-red-900/60 text-red-300 text-xs font-bold tracking-wider uppercase flex items-center justify-center gap-2 rounded-xs transition-colors cursor-pointer shadow-[0_0_10px_rgba(220,38,38,0.25)]"
+            >
+              <Play className="w-3 h-3 fill-current text-red-400" />
+              <span>TEST ULTRON VOCAL ENGINE</span>
+            </button>
           </div>
 
           {/* Neural Temp */}

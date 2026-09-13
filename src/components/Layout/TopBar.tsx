@@ -93,6 +93,10 @@ export const TopBar: React.FC<TopBarProps> = ({
             <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shadow-[0_0_6px_#f97316]" />
             VOICE READY
           </span>
+          <span className="flex items-center gap-1.5 px-2 py-0.5 bg-[#0e1017] border border-zinc-800 text-zinc-300">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee]" />
+            OPTICS READY
+          </span>
         </div>
       </div>
 

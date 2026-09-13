@@ -1,24 +1,23 @@
 /**
- * AICore 3D Robotic AI Core & Face Presentation
+ * AICore Component
  *
- * Built with Three.js & React Three Fiber:
- * - Procedural metallic robotic face/skull plates
- * - Glowing crimson optic eyes with state-based intensity
- * - Glowing central neural arc core
- * - Articulating jaw for SPEAKING state
- * - Subtle breathing, head-bobbing, and mouse tracking
- * - Holographic rings, scanner lines, and neural particles overlay
+ * 3D Robotic AI Core rendered with Three.js via @react-three/fiber:
+ * - Animated mechanical cranium and segmented jaw articulation
+ * - Realtime hand gesture optical tracking integration (guides face orientation toward user's hand)
+ * - Synced with requestAnimationFrame-driven NeuralNetworkRing matrix
+ * - Glowing crimson optic lenses and tactical coordinate HUD
  */
 
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { AIStateMode } from '../../types/index.ts';
-import { AICoreRings } from './AICoreRings.tsx';
-import { NeuralRing } from './NeuralRing.tsx';
+import { NeuralNetworkRing } from './NeuralNetworkRing.tsx';
 import { AIScanner } from './AIScanner.tsx';
 import { AIEyes } from './AIEyes.tsx';
 import { AINeuralNetwork } from './AINeuralNetwork.tsx';
+import { StageGestureHUD } from '../Gestures/StageGestureHUD.tsx';
+import { gestureEngine } from '../../utils/handGestureDetector.ts';
 
 interface RoboticFaceMeshProps {
   state: AIStateMode;
@@ -55,10 +54,23 @@ const RoboticFaceMesh: React.FC<RoboticFaceMeshProps> = ({ state }) => {
     const t = stateContext.clock.getElapsedTime();
 
     if (groupRef.current) {
-      // Idle head breathing & subtle rotational drift
+      // Check if optical hand tracking is active to smoothly turn face toward user's hand
+      const isTracking = gestureEngine.landmarks.isTracking;
+      let targetRotY = Math.sin(t * 0.8) * 0.08;
+      let targetRotX = Math.sin(t * 1.2) * 0.04;
+
+      if (isTracking) {
+        // Map hand centroid (0..1) to head yaw (-0.45..0.45 rad) and pitch (-0.25..0.25 rad)
+        const handX = (gestureEngine.landmarks.palmCenter.x - 0.5) * 2;
+        const handY = (gestureEngine.landmarks.palmCenter.y - 0.5) * 2;
+        targetRotY = -handX * 0.45;
+        targetRotX = handY * 0.3;
+      }
+
+      // Smooth lerp toward target rotation
+      groupRef.current.rotation.y += (targetRotY - groupRef.current.rotation.y) * 0.12;
+      groupRef.current.rotation.x += (targetRotX - groupRef.current.rotation.x) * 0.12;
       groupRef.current.position.y = Math.sin(t * 1.5) * 0.05;
-      groupRef.current.rotation.y = Math.sin(t * 0.8) * 0.08;
-      groupRef.current.rotation.x = Math.sin(t * 1.2) * 0.04;
 
       if (state === 'SECURITY_ALERT') {
         // Subtle aggressive micro-jitter in alert mode
@@ -110,84 +122,99 @@ const RoboticFaceMesh: React.FC<RoboticFaceMeshProps> = ({ state }) => {
         />
       </mesh>
 
-      {/* Forehead Armor Brow */}
-      <mesh position={[0, 0.28, 0.42]}>
-        <boxGeometry args={[0.92, 0.18, 0.15]} />
-        <meshStandardMaterial color="#181a24" metalness={0.95} roughness={0.2} />
+      {/* Cranium Facet Chamfers */}
+      <mesh position={[0, 0.72, -0.05]} rotation={[-0.3, 0, 0]}>
+        <boxGeometry args={[0.82, 0.22, 0.7]} />
+        <meshStandardMaterial color="#171924" metalness={0.85} roughness={0.25} />
       </mesh>
 
-      {/* Central Forehead Neural Crest / Core */}
-      <mesh ref={coreRef} position={[0, 0.52, 0.42]} rotation={[0, 0, Math.PI / 4]}>
-        <boxGeometry args={[0.16, 0.16, 0.08]} />
-        <meshBasicMaterial color={opticColor} />
+      {/* Forehead Ridge / Sensor Array */}
+      <mesh position={[0, 0.48, 0.42]}>
+        <boxGeometry args={[0.7, 0.08, 0.05]} />
+        <meshStandardMaterial
+          color={opticColor}
+          emissive={opticColor}
+          emissiveIntensity={0.8}
+        />
       </mesh>
 
-      {/* Left Cheek / Temporal Plate */}
-      <mesh position={[-0.48, 0.1, 0.1]} rotation={[0, 0.3, 0]}>
-        <boxGeometry args={[0.12, 0.5, 0.7]} />
-        <meshStandardMaterial color="#12141d" metalness={0.9} roughness={0.25} />
+      {/* Central Eye / Optic Visor Bridge */}
+      <mesh position={[0, 0.16, 0.38]}>
+        <boxGeometry args={[0.82, 0.2, 0.15]} />
+        <meshStandardMaterial color="#050609" metalness={0.95} roughness={0.1} />
       </mesh>
 
-      {/* Right Cheek / Temporal Plate */}
-      <mesh position={[0.48, 0.1, 0.1]} rotation={[0, -0.3, 0]}>
-        <boxGeometry args={[0.12, 0.5, 0.7]} />
-        <meshStandardMaterial color="#12141d" metalness={0.9} roughness={0.25} />
+      {/* Left Glowing Crimson Optic Aperture */}
+      <mesh ref={leftEyeRef} position={[-0.24, 0.16, 0.46]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.075, 0.075, 0.04, 16]} />
+        <meshStandardMaterial
+          color={opticColor}
+          emissive={opticColor}
+          emissiveIntensity={2.4}
+        />
       </mesh>
 
-      {/* Left Glowing Optic Eye */}
-      <mesh ref={leftEyeRef} position={[-0.24, 0.12, 0.44]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.07, 0.07, 0.04, 16]} />
-        <meshBasicMaterial color={opticColor} />
+      {/* Right Glowing Crimson Optic Aperture */}
+      <mesh ref={rightEyeRef} position={[0.24, 0.16, 0.46]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.075, 0.075, 0.04, 16]} />
+        <meshStandardMaterial
+          color={opticColor}
+          emissive={opticColor}
+          emissiveIntensity={2.4}
+        />
       </mesh>
 
-      {/* Right Glowing Optic Eye */}
-      <mesh ref={rightEyeRef} position={[0.24, 0.12, 0.44]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.07, 0.07, 0.04, 16]} />
-        <meshBasicMaterial color={opticColor} />
+      {/* Nose Bridge / Vent Mesh */}
+      <mesh position={[0, -0.04, 0.42]}>
+        <boxGeometry args={[0.18, 0.22, 0.12]} />
+        <meshStandardMaterial color="#1a1d29" metalness={0.8} roughness={0.3} />
       </mesh>
 
-      {/* Nose Bridge / Central Divider */}
-      <mesh position={[0, 0.05, 0.45]}>
-        <boxGeometry args={[0.1, 0.25, 0.12]} />
-        <meshStandardMaterial color="#0b0d13" metalness={0.95} roughness={0.15} />
+      {/* Cheekbone Armored Plates (Left & Right) */}
+      <mesh position={[-0.42, 0.0, 0.24]} rotation={[0, 0.4, 0]}>
+        <boxGeometry args={[0.25, 0.45, 0.4]} />
+        <meshStandardMaterial color="#11131c" metalness={0.9} roughness={0.2} />
+      </mesh>
+      <mesh position={[0.42, 0.0, 0.24]} rotation={[0, -0.4, 0]}>
+        <boxGeometry args={[0.25, 0.45, 0.4]} />
+        <meshStandardMaterial color="#11131c" metalness={0.9} roughness={0.2} />
       </mesh>
 
-      {/* Lower Face & Articulating Jaw Group */}
-      <group ref={jawRef} position={[0, -0.45, 0]}>
-        {/* Chin / Mandible Armor */}
-        <mesh position={[0, 0.15, 0.35]}>
-          <boxGeometry args={[0.6, 0.25, 0.35]} />
-          <meshStandardMaterial color="#161822" metalness={0.92} roughness={0.2} />
+      {/* Mouth Vent / Audio Transducer Chamber */}
+      <mesh position={[0, -0.22, 0.38]}>
+        <boxGeometry args={[0.48, 0.14, 0.1]} />
+        <meshStandardMaterial
+          color="#020305"
+          emissive={state === 'SPEAKING' ? opticColor : '#000000'}
+          emissiveIntensity={state === 'SPEAKING' ? 1.5 : 0}
+        />
+      </mesh>
+
+      {/* Rotating Internal Sub-Core Sphere inside the head */}
+      <mesh ref={coreRef} position={[0, 0.1, 0]}>
+        <icosahedronGeometry args={[0.24, 1]} />
+        <meshStandardMaterial
+          color={opticColor}
+          wireframe={true}
+          emissive={opticColor}
+          emissiveIntensity={1.2}
+        />
+      </mesh>
+
+      {/* Articulated Lower Jaw Assembly */}
+      <group ref={jawRef} position={[0, -0.45, 0.1]}>
+        <mesh position={[0, 0, 0.2]}>
+          <boxGeometry args={[0.55, 0.24, 0.35]} />
+          <meshStandardMaterial color="#0c0e15" metalness={0.92} roughness={0.2} />
         </mesh>
-
-        {/* Mouth Audio Slit / Heat Grill */}
-        <mesh position={[0, 0.25, 0.46]}>
-          <boxGeometry args={[0.4, 0.04, 0.05]} />
-          <meshBasicMaterial color={opticColor} />
-        </mesh>
-
-        {/* Lower Chin Tip */}
-        <mesh position={[0, 0.02, 0.38]} rotation={[0.2, 0, 0]}>
-          <boxGeometry args={[0.3, 0.14, 0.2]} />
-          <meshStandardMaterial color="#0a0c12" metalness={0.95} roughness={0.15} />
+        {/* Chin Taper Point */}
+        <mesh position={[0, -0.16, 0.28]} rotation={[-0.4, 0, 0]}>
+          <boxGeometry args={[0.32, 0.18, 0.25]} />
+          <meshStandardMaterial color="#1c202e" metalness={0.88} roughness={0.2} />
         </mesh>
       </group>
 
-      {/* Neck Servos & Conduits */}
-      <mesh position={[-0.15, -0.65, 0]}>
-        <cylinderGeometry args={[0.06, 0.06, 0.4, 12]} />
-        <meshStandardMaterial color="#1e2029" metalness={0.8} roughness={0.3} />
-      </mesh>
-      <mesh position={[0.15, -0.65, 0]}>
-        <cylinderGeometry args={[0.06, 0.06, 0.4, 12]} />
-        <meshStandardMaterial color="#1e2029" metalness={0.8} roughness={0.3} />
-      </mesh>
-
-      {/* Chest Arc Reactor (Glowing Red Neural Core) */}
-      <mesh position={[0, -0.85, 0.18]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.16, 0.16, 0.05, 24]} />
-        <meshBasicMaterial color={opticColor} />
-      </mesh>
+      {/* Neck Cervical Strut */}
       <mesh position={[0, -0.85, 0.16]}>
         <boxGeometry args={[0.8, 0.3, 0.3]} />
         <meshStandardMaterial color="#0d0f16" metalness={0.9} roughness={0.2} />
@@ -203,14 +230,11 @@ interface AICoreProps {
 export const AICore: React.FC<AICoreProps> = ({ state }) => {
   return (
     <div className="relative w-full h-[420px] sm:h-[480px] lg:h-[520px] flex items-center justify-center overflow-hidden">
-      {/* Background Neural Network Constellation */}
+      {/* Background Neural Network Constellation (rAF optimized) */}
       <AINeuralNetwork state={state} />
 
-      {/* Animated Multi-Layered Neural Network Ring (Framer Motion + SVG) */}
-      <NeuralRing state={state} />
-
-      {/* Rotating Mechanical Holographic HUD Rings */}
-      <AICoreRings state={state} />
+      {/* Lightweight Multi-Layered Neural Network Ring (rAF-driven canvas + SVG matrix) */}
+      <NeuralNetworkRing state={state} size={560} />
 
       {/* Optic Status & Lumen HUD telemetry */}
       <AIEyes state={state} />
@@ -233,6 +257,9 @@ export const AICore: React.FC<AICoreProps> = ({ state }) => {
 
         <RoboticFaceMesh state={state} />
       </Canvas>
+
+      {/* Optical Hand Tracking Skeleton & Coordinate HUD Overlay (Active during Camera Feed) */}
+      <StageGestureHUD />
 
       {/* Floating Tactical Coordinates Overlay */}
       <div className="absolute bottom-4 right-4 z-20 font-mono text-[9px] text-zinc-300 pointer-events-none text-right">

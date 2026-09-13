@@ -1,6 +1,6 @@
 {
   "name": "Personal AI Assistant",
   "description": "A cinematic, powerful robotic AI operating system featuring an autonomous mechanical 3D core, airgap defense sentinel, vector intelligence, and system telemetry.",
-  "requestFramePermissions": ["microphone"],
+  "requestFramePermissions": ["microphone", "camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
