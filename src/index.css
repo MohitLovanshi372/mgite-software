@@ -1,1 +1,99 @@
 @import "tailwindcss";
+
+@layer utilities {
+  /* Crimson red custom scrollbar for robotic dark OS */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(10, 10, 12, 0.8);
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(220, 38, 38, 0.4);
+    border-radius: 2px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(239, 68, 68, 0.8);
+  }
+
+  /* Angular HUD Corner Clips */
+  .hud-clip-tr {
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+  }
+  .hud-clip-all {
+    clip-path: polygon(8px 0%, calc(100% - 8px) 0%, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0% calc(100% - 8px), 0% 8px);
+  }
+  .hud-clip-cut {
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
+  }
+
+  /* Scanlines Overlay */
+  .bg-scanlines {
+    background-image: linear-gradient(
+      rgba(0, 0, 0, 0) 50%,
+      rgba(0, 0, 0, 0.4) 50%
+    );
+    background-size: 100% 4px;
+  }
+
+  /* Grid pattern */
+  .bg-tech-grid {
+    background-size: 32px 32px;
+    background-image: 
+      linear-gradient(to right, rgba(239, 68, 68, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(239, 68, 68, 0.05) 1px, transparent 1px);
+  }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes spin-reverse-slow {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes crimson-pulse {
+  0%, 100% {
+    opacity: 0.4;
+    filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.4));
+  }
+  50% {
+    opacity: 0.9;
+    filter: drop-shadow(0 0 24px rgba(239, 68, 68, 0.85));
+  }
+}
+
+@keyframes radar-sweep {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes scanner-bar {
+  0% { top: 0%; opacity: 0.8; }
+  50% { top: 100%; opacity: 1; }
+  100% { top: 0%; opacity: 0.8; }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 24s linear infinite;
+}
+
+.animate-spin-reverse-slow {
+  animation: spin-reverse-slow 32s linear infinite;
+}
+
+.animate-crimson-pulse {
+  animation: crimson-pulse 3s ease-in-out infinite;
+}
+
+.animate-radar-sweep {
+  animation: radar-sweep 4s linear infinite;
+}
+
+.animate-scanner-bar {
+  animation: scanner-bar 2.8s ease-in-out infinite;
+}

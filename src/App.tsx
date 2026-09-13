@@ -1,181 +1,338 @@
 /**
- * Personal AI Assistant - Desktop Interface Entry Point (Phase 1 Foundation)
- * Integrates Titlebar, Chat Interface, SQLite Memory Inspector, System Logs, Settings, and Architecture Drawer.
+ * Main Application Entry Point
+ * Cinematic Autonomous Robotic AI Operating System (Ultron Aesthetic)
+ *
+ * Full-screen HUD layout:
+ * - TopBar: Identity, status telemetry, synchronized clock, security badge, window controls
+ * - Sidebar: 14 Mechanical Navigation Pages
+ * - Main Center Stage: Active view with 3D Robotic AI Core & Bottom Command Console
+ * - RightPanel: Live Radar sweep, System status, Background processes, Hardware telemetry, Activity feed
+ * - Full interactive mock state cycle: IDLE -> LISTENING -> THINKING -> EXECUTING -> SPEAKING
  */
 
-import React, { useState, useEffect } from 'react';
-import { TitleBar } from '../apps/desktop/renderer/components/TitleBar.tsx';
-import { ChatInterface } from '../apps/desktop/renderer/components/ChatInterface.tsx';
-import { CommandCenter } from '../apps/desktop/renderer/components/CommandCenter.tsx';
-import { SettingsModal } from '../apps/desktop/renderer/components/SettingsModal.tsx';
-import { MemoryInspector } from '../apps/desktop/renderer/components/MemoryInspector.tsx';
-import { LogsViewer } from '../apps/desktop/renderer/components/LogsViewer.tsx';
-import { ArchitectureDrawer } from '../apps/desktop/renderer/components/ArchitectureDrawer.tsx';
-import { useOnlineStatus } from '../apps/desktop/renderer/hooks/useOnlineStatus.ts';
-import { useAssistant } from '../apps/desktop/renderer/hooks/useAssistant.ts';
-import { apiService } from '../apps/desktop/renderer/services/api.ts';
-import { SystemStatus } from '../apps/desktop/renderer/types/index.ts';
-import { WifiOff, AlertCircle } from 'lucide-react';
+import React, { useState, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { ChevronLeft } from 'lucide-react';
+import { TopBar } from './components/Layout/TopBar.tsx';
+import { Sidebar } from './components/Layout/Sidebar.tsx';
+import { RightPanel } from './components/Layout/RightPanel.tsx';
+import { CommandConsole } from './components/Layout/CommandConsole.tsx';
+
+// Pages
+import { CommandCenter } from './pages/CommandCenter.tsx';
+import { IntelligencePage } from './pages/Intelligence.tsx';
+import { MemoryPage } from './pages/Memory.tsx';
+import { TasksPage } from './pages/Tasks.tsx';
+import { CalendarPage } from './pages/Calendar.tsx';
+import { ResearchPage } from './pages/Research.tsx';
+import { DocumentsPage } from './pages/Documents.tsx';
+import { ApplicationsPage } from './pages/Applications.tsx';
+import { NotificationsPage } from './pages/Notifications.tsx';
+import { SystemControlPage } from './pages/SystemControl.tsx';
+import { NetworkPage } from './pages/Network.tsx';
+import { LogsPage } from './pages/Logs.tsx';
+import { ArchitecturePage } from './pages/Architecture.tsx';
+import { SettingsPage } from './pages/Settings.tsx';
+
+import { NavigationPageId, AIStateMode, NotificationItem } from './types/index.ts';
+import { initialNotifications } from './data/mockData.ts';
+import { soundFx } from './utils/audioEffects.ts';
 
 export default function App() {
-  const {
-    isOnline,
-    manualOfflineMode,
-    cloudAiAvailable,
-    toggleManualOffline,
-    refreshStatus,
-  } = useOnlineStatus();
+  const [activePage, setActivePage] = useState<NavigationPageId>('command_center');
+  const [avatarState, setAvatarState] = useState<AIStateMode>('IDLE');
+  const [isListening, setIsListening] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState<string>('');
+  const [lastAssistantMessage, setLastAssistantMessage] = useState<string>(
+    'Systems online. Sovereign airgap barrier verified. I observe. I analyze. I act.'
+  );
 
-  const {
-    conversations,
-    activeConversationId,
-    setActiveConversationId,
-    messages,
-    isLoading,
-    errorMessage,
-    sendMessage,
-    retryLastMessage,
-    startNewConversation,
-    deleteConversation,
-    clearAllHistory,
-    refreshConversations,
-  } = useAssistant(!isOnline);
+  // Right Intelligence Panel Visibility State (for entry/exit animations)
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState<boolean>(true);
 
-  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
-  const [viewMode, setViewMode] = useState<'command_center' | 'workspace'>('command_center');
-  const [showSettings, setShowSettings] = useState(false);
-  const [showMemory, setShowMemory] = useState(false);
-  const [showLogs, setShowLogs] = useState(false);
-  const [showArchitecture, setShowArchitecture] = useState(false);
+  // Notification State & Pulse Key (pulses the Right Intelligence Panel on new alerts)
+  const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
+  const [notificationPulseKey, setNotificationPulseKey] = useState<number>(0);
+  const [latestNotification, setLatestNotification] = useState<NotificationItem | null>(null);
 
-  // Compute the last assistant message content for the avatar speech bubble
-  const lastAssistantMsg = [...messages]
-    .reverse()
-    .find((m) => m.sender === 'assistant' && m.content?.trim())?.content;
+  const speechTimeoutRef = useRef<any>(null);
 
-  const loadStatus = async () => {
-    try {
-      const data = await apiService.getStatus();
-      setSystemStatus(data);
-    } catch (err) {
-      console.warn('Backend status check pending or offline:', err);
+  const handleStateChange = useCallback((newState: AIStateMode) => {
+    setAvatarState(newState);
+    soundFx.playStateSound(newState);
+  }, []);
+
+  // Autonomous Notification Dispatch (adds notification, pulses right panel, plays acoustic ping)
+  const dispatchNotification = useCallback(
+    (title: string, subsystem = 'AUTONOMOUS SENTINEL', isUrgent = false) => {
+      const now = new Date();
+      const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+      const newNotif: NotificationItem = {
+        id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        subsystem,
+        title,
+        time: timeStr,
+        isUrgent,
+        read: false,
+      };
+
+      setNotifications((prev) => [newNotif, ...prev]);
+      setLatestNotification(newNotif);
+      setNotificationPulseKey((prev) => prev + 1);
+      soundFx.playNotificationPing();
+    },
+    []
+  );
+
+  // Autonomous Execution Cycle
+  const triggerAICycle = useCallback(
+    (commandText: string) => {
+      if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
+
+      // 1. LISTENING
+      handleStateChange('LISTENING');
+      setIsListening(true);
+      setInterimTranscript(commandText);
+
+      // 2. THINKING (1.2s)
+      speechTimeoutRef.current = setTimeout(() => {
+        handleStateChange('THINKING');
+        setIsListening(false);
+        setInterimTranscript('');
+
+        // 3. EXECUTING (1.4s)
+        speechTimeoutRef.current = setTimeout(() => {
+          handleStateChange('EXECUTING');
+
+          // 4. SPEAKING (1.3s)
+          speechTimeoutRef.current = setTimeout(() => {
+            handleStateChange('SPEAKING');
+
+            const responses = [
+              `Directive recognized: "${commandText}". Local vector graphs indexed. Kinematic servos executing.`,
+              `Affirmative. "${commandText}" executed under sovereign clearance. Zero telemetry egress.`,
+              `Neural synthesis complete for: "${commandText}". Internal registers locked and nominal.`,
+              `Autonomous plan finalized. All tasks, schedules, and process bridges synchronized.`,
+            ];
+            const response = responses[Math.floor(Math.random() * responses.length)];
+            setLastAssistantMessage(response);
+
+            // 5. SUCCESS -> IDLE
+            speechTimeoutRef.current = setTimeout(() => {
+              handleStateChange('SUCCESS');
+
+              // Dispatch autonomous notification & pulse Right Panel
+              dispatchNotification(
+                `Directive executed: "${commandText.slice(0, 42)}"`,
+                'DIRECTIVE ENGINE'
+              );
+
+              speechTimeoutRef.current = setTimeout(() => {
+                handleStateChange('IDLE');
+              }, 1600);
+            }, 4500);
+          }, 1300);
+        }, 1400);
+      }, 1200);
+    },
+    [handleStateChange, dispatchNotification]
+  );
+
+  const handleToggleListening = () => {
+    if (isListening) {
+      setIsListening(false);
+      handleStateChange('IDLE');
+      setInterimTranscript('');
+      if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
+    } else {
+      triggerAICycle('Analyze system defense perimeter and pending directives.');
     }
   };
 
-  useEffect(() => {
-    loadStatus();
-    const interval = setInterval(loadStatus, 15000);
-    return () => clearInterval(interval);
-  }, []);
+  const handleSecurityAlert = () => {
+    if (avatarState === 'SECURITY_ALERT') {
+      handleStateChange('IDLE');
+      setLastAssistantMessage('Security alarm silenced. Perimeter returned to nominal standby.');
+    } else {
+      handleStateChange('SECURITY_ALERT');
+      setLastAssistantMessage('CRITICAL ALERT: Unauthorized network probing intercepted by airgap sentinel.');
+    }
+  };
+
+  const handleThreatChange = (threat: 'LOW' | 'ELEVATED' | 'CRITICAL') => {
+    if (threat === 'CRITICAL') {
+      handleStateChange('SECURITY_ALERT');
+    } else if (threat === 'ELEVATED') {
+      handleStateChange('THINKING');
+    } else {
+      handleStateChange('IDLE');
+    }
+  };
+
+  // Render the selected view
+  const renderActivePage = () => {
+    switch (activePage) {
+      case 'command_center':
+        return (
+          <CommandCenter
+            avatarState={avatarState}
+            onAvatarStateChange={handleStateChange}
+            interimTranscript={interimTranscript}
+            lastAssistantMessage={lastAssistantMessage}
+          />
+        );
+      case 'intelligence':
+        return <IntelligencePage />;
+      case 'memory':
+        return <MemoryPage />;
+      case 'tasks':
+        return <TasksPage />;
+      case 'calendar':
+        return <CalendarPage />;
+      case 'research':
+        return <ResearchPage />;
+      case 'documents':
+        return <DocumentsPage />;
+      case 'applications':
+        return <ApplicationsPage />;
+      case 'notifications':
+        return (
+          <NotificationsPage
+            notifications={notifications}
+            onMarkAll={() =>
+              setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+            }
+            onClearAll={() => setNotifications([])}
+            onDispatchTest={() =>
+              dispatchNotification(
+                'Manual security dispatch: Airgap isolation barrier confirmed.',
+                'SECURITY SENTINEL'
+              )
+            }
+          />
+        );
+      case 'system_control':
+        return <SystemControlPage />;
+      case 'network':
+        return <NetworkPage />;
+      case 'logs':
+        return <LogsPage />;
+      case 'architecture':
+        return <ArchitecturePage />;
+      case 'settings':
+        return <SettingsPage />;
+      default:
+        return null;
+    }
+  };
+
+  const unreadNotificationsCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 text-slate-100 select-none font-sans">
-      {/* 1. Desktop TitleBar */}
-      <TitleBar
-        assistantName={systemStatus?.assistant_name || 'JARVIS'}
-        isOnline={isOnline}
-        manualOfflineMode={manualOfflineMode}
-        viewMode={viewMode}
-        onToggleViewMode={() =>
-          setViewMode((prev) => (prev === 'command_center' ? 'workspace' : 'command_center'))
-        }
-        onToggleOffline={toggleManualOffline}
-        onOpenSettings={() => setShowSettings(true)}
-        onOpenMemory={() => setShowMemory(true)}
-        onOpenLogs={() => setShowLogs(true)}
-        onOpenArchitecture={() => setShowArchitecture(true)}
-      />
-
-      {/* 2. Offline Notice Banner if in Offline Mode */}
-      {!isOnline && (
-        <div
-          id="offline-banner"
-          className="bg-amber-950/80 border-b border-amber-800/80 px-4 py-1.5 flex items-center justify-between text-xs text-amber-200"
-        >
-          <div className="flex items-center gap-2">
-            <WifiOff className="w-3.5 h-3.5 text-amber-400" />
-            <span>
-              {manualOfflineMode
-                ? 'Manual Offline Mode is active. Cloud AI calls are blocked; local SQLite memory & local responses are operational.'
-                : !cloudAiAvailable
-                ? 'GEMINI_API_KEY is not configured or network unreachable. Operating in local-only fallback mode with SQLite.'
-                : 'Offline: Operating in local-only mode.'}
-            </span>
-          </div>
-          <button
-            onClick={toggleManualOffline}
-            className="text-[11px] underline hover:text-amber-100 font-mono cursor-pointer"
-          >
-            {manualOfflineMode ? 'Switch to Online' : 'Check Settings'}
-          </button>
-        </div>
-      )}
-
-      {/* 3. Error Banner if active */}
-      {errorMessage && (
-        <div className="bg-red-950/80 border-b border-red-800/80 px-4 py-1.5 flex items-center gap-2 text-xs text-red-200">
-          <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-          <span>{errorMessage}</span>
-        </div>
-      )}
-
-      {/* 4. Active Main View: 3D Command Center OR Detailed Workspace */}
-      <div className="flex-1 overflow-hidden relative">
-        {viewMode === 'command_center' ? (
-          <CommandCenter
-            assistantName={systemStatus?.assistant_name || 'JARVIS'}
-            isOnline={isOnline}
-            isLoading={isLoading}
-            lastAssistantMessage={lastAssistantMsg}
-            onSendMessage={sendMessage}
-            onOpenChat={() => setViewMode('workspace')}
-            onOpenTasks={() => setShowArchitecture(true)}
-            onOpenMemory={() => setShowMemory(true)}
-            onOpenSettings={() => setShowSettings(true)}
-          />
-        ) : (
-          <ChatInterface
-            conversations={conversations}
-            activeConversationId={activeConversationId}
-            messages={messages}
-            isLoading={isLoading}
-            isOnline={isOnline}
-            onSelectConversation={(id) => setActiveConversationId(id)}
-            onNewConversation={startNewConversation}
-            onDeleteConversation={deleteConversation}
-            onClearAllHistory={clearAllHistory}
-            onRetryMessage={retryLastMessage}
-            onSendMessage={sendMessage}
-          />
-        )}
-      </div>
-
-      {/* 5. Modals & Drawers */}
-      <SettingsModal
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-        systemStatus={systemStatus}
-        onConfigChanged={() => {
-          loadStatus();
-          refreshStatus();
-          refreshConversations();
+    <div
+      id="ultron-root-app"
+      className="flex flex-col h-screen w-screen overflow-hidden bg-[#020306] text-zinc-100 font-mono select-none"
+    >
+      {/* 1. Futuristic Top Bar */}
+      <TopBar
+        onSecurityClick={handleSecurityAlert}
+        onStatusClick={() => setActivePage('system_control')}
+        isRightPanelOpen={isRightPanelOpen}
+        onToggleRightPanel={() => {
+          soundFx.playClick();
+          setIsRightPanelOpen((prev) => !prev);
+        }}
+        onSimulateNotification={() => {
+          const alertPool = [
+            { title: 'Subsystem ping verified: Optical sensory grid nominal.', sys: 'PERIMETER RADAR' },
+            { title: 'Airgap firewall audit completed: Zero telemetry egress detected.', sys: 'SECURITY SENTINEL' },
+            { title: 'Neural weight matrix re-synchronized across active memory registers.', sys: 'CORE INFERENCE' },
+            { title: 'Autonomous background task scheduled: Thermal dissipation verified.', sys: 'HARDWARE TELEMETRY' },
+          ];
+          const pick = alertPool[Math.floor(Math.random() * alertPool.length)];
+          dispatchNotification(pick.title, pick.sys);
         }}
       />
 
-      <MemoryInspector
-        isOpen={showMemory}
-        onClose={() => setShowMemory(false)}
-      />
+      {/* 2. Main Three-Column Workspace Layout */}
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Left Navigation Sidebar (14 pages) */}
+        <Sidebar
+          activePage={activePage}
+          onNavigate={(page) => {
+            soundFx.playClick();
+            setActivePage(page);
+          }}
+          badgeCounts={{ tasks: 3, notifications: unreadNotificationsCount, memory: 4 }}
+        />
 
-      <LogsViewer
-        isOpen={showLogs}
-        onClose={() => setShowLogs(false)}
-      />
+        {/* Center Main Stage View (Active page + Command Console) */}
+        <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-[#040508] relative">
+          <div className="flex-1 overflow-hidden relative">
+            {renderActivePage()}
+          </div>
 
-      <ArchitectureDrawer
-        isOpen={showArchitecture}
-        onClose={() => setShowArchitecture(false)}
-      />
+          {/* Bottom Command Console (Always accessible across views or in Command Center) */}
+          <CommandConsole
+            onExecute={triggerAICycle}
+            isListening={isListening}
+            onToggleListening={handleToggleListening}
+            onNavigate={(page) => {
+              soundFx.playClick();
+              setActivePage(page);
+            }}
+          />
+        </main>
+
+        {/* Right Intelligence Panel with Framer Motion entry, exit & notification pulse */}
+        <AnimatePresence mode="wait">
+          {isRightPanelOpen && (
+            <RightPanel
+              key="right-intelligence-panel"
+              onThreatChange={handleThreatChange}
+              onClose={() => {
+                soundFx.playClick();
+                setIsRightPanelOpen(false);
+              }}
+              notificationPulseKey={notificationPulseKey}
+              latestNotification={latestNotification}
+              onTriggerTestNotification={() =>
+                dispatchNotification(
+                  'Sensory grid ping: Thermal flux stabilized across GPU nodes.',
+                  'TELEMETRY SENTINEL'
+                )
+              }
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Sleek floating expand tab when Right Panel is collapsed */}
+        <AnimatePresence>
+          {!isRightPanelOpen && (
+            <motion.button
+              key="intel-expand-handle"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.25 }}
+              onClick={() => {
+                soundFx.playClick();
+                setIsRightPanelOpen(true);
+              }}
+              title="Expand Intelligence Panel"
+              className="absolute right-0 top-1/2 -translate-y-1/2 z-20 bg-[#07080c]/95 border-l border-t border-b border-red-600/70 hover:border-red-500 text-zinc-300 hover:text-red-400 py-3.5 px-1.5 flex flex-col items-center gap-2 rounded-l-xs shadow-[-4px_0_14px_rgba(220,38,38,0.3)] cursor-pointer transition-colors"
+            >
+              <ChevronLeft className="w-3.5 h-3.5 text-red-500 animate-pulse" />
+              <span className="text-[9px] font-bold tracking-widest uppercase [writing-mode:vertical-lr] rotate-180">
+                INTEL // EXPAND
+              </span>
+              {unreadNotificationsCount > 0 && (
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
+              )}
+            </motion.button>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

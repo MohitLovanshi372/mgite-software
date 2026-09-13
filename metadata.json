@@ -1,6 +1,6 @@
 {
   "name": "Personal AI Assistant",
-  "description": "A privacy-first, local-first personal AI assistant with modular orchestrator, SQLite memory foundation, Voice Engine, and Notification Intelligence Privacy Shield.",
+  "description": "A cinematic, powerful robotic AI operating system featuring an autonomous mechanical 3D core, airgap defense sentinel, vector intelligence, and system telemetry.",
   "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
