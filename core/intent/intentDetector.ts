@@ -88,11 +88,18 @@ export class IntentDetector {
       strategy = 'DIRECT_ANSWER';
     }
 
+    const isYouTubeOrMusic =
+      classification.intent === 'open_youtube' ||
+      classification.intent === 'search_youtube' ||
+      classification.intent === 'play_music' ||
+      classification.intent === 'stop_music';
+
     return {
       intent: classification.intent,
       confidence: classification.confidence,
       entities,
       requiresAction:
+        isYouTubeOrMusic ||
         classification.intent === 'REMINDER_REQUEST' ||
         classification.intent === 'COMPUTER_ACTION_REQUEST' ||
         classification.intent === 'TASK_REQUEST' ||
@@ -102,6 +109,7 @@ export class IntentDetector {
       clarificationQuestion,
       reasoning: classification.reasoning || risk.reason,
       rawInput: text,
+      query: entities.query,
     };
   }
 
@@ -119,10 +127,14 @@ export class IntentDetector {
     clarificationPrompt?: string;
     reasoning?: string;
   } {
+    // Strip leading wake words ("jarvis, ", "hey jarvis, ", "जार्विस, ") for clean command recognition
+    const strippedLower = lower.replace(/^(hey\s+)?(jarvis|ultron|जार्विस)[\s,:;—-]+/i, '').trim();
+    const target = strippedLower || lower;
+
     // A. Ambiguous expressions needing clarification (e.g., "kal wala kar dena", "vo kaam kar do")
     if (
       /^(kal\s+wala\s+kar\s+dena|vo\s+kar\s+dena|uska\s+kuch\s+karo|do\s+that\s+thing|kal\s+wala|kal\s+ka\s+kar\s+do)$/i.test(
-        lower
+        target
       )
     ) {
       return {
@@ -137,7 +149,7 @@ export class IntentDetector {
     // B. MEMORY REQUEST ("meri ye baat yaad rakhna", "remember that...", "yaad rakhna ki...", "bhool jao")
     if (
       /(yaad\s+rakhna|yaad\s+rakho|remember\s+that|remember\s+this|store\s+this|save\s+to\s+memory|bhool\s+jao|delete\s+memory|forget\s+that)/i.test(
-        lower
+        target
       )
     ) {
       return {
@@ -150,7 +162,7 @@ export class IntentDetector {
     // C. REMINDER REQUEST ("kal mujhe 10 baje yaad dila dena", "subah 8 baje yaad dila dena", "remind me to...", "alarm lagao", "reminder laga dena")
     if (
       /(yaad\s+dila\s+dena|yaad\s+dilana|yaad\s+dila|remind\s+me|reminder\s*(laga|set|kar|banao|add|create|dena)|\breminder\b|alarm\s*(lagao|set))/i.test(
-        lower
+        target
       )
     ) {
       return {
@@ -162,7 +174,7 @@ export class IntentDetector {
 
     // Contextual reminder: User said "Kal college hai" then "Subah 8 baje yaad dila dena"
     if (
-      /(yaad\s+dila|remind)/i.test(lower) &&
+      /(yaad\s+dila|remind)/i.test(target) &&
       contextSnippet &&
       /(college|office|meeting|class|flight)/i.test(contextSnippet)
     ) {
@@ -173,17 +185,127 @@ export class IntentDetector {
       };
     }
 
-    // D. COMPUTER ACTION REQUEST ("youtube kholo", "open chrome", "youtube par coding video chalao", "paise transfer kar do", "turn on wifi", "run powershell command")
+    // H1. SYSTEM STATUS REQUEST (Placed before generic action commands so "system status dikhao" is precisely classified)
+    // Matches "Jarvis, system status dikhao", "status dikhao", "system status", "battery kitni hai", "सिस्टम स्टेटस दिखाओ"
     if (
-      /(kholo|open\s+|chalao|play\s+|turn\s+on|turn\s+off|band\s+karo|volume\s+|screenshot|transfer\s+money|paise\s+transfer|send\s+money|powershell|terminal|bash|shell|command|rm\s+-rf|shutdown|reboot|run\s+)/i.test(
-        lower
+      /(system\s+status|status\s*(dikhao|batao|bataiye|check|karo|bata|kya\s+hai)|system\s*(check|status|vitals|health)|battery|cpu\s+usage|ram\s+usage|disk\s+space|battery\s+kitni\s+hai|सिस्टम\s*स्टेटस|स्टेटस\s*(दिखाओ|बताओ))/i.test(
+        target
+      )
+    ) {
+      return {
+        intent: 'SYSTEM_STATUS_REQUEST',
+        confidence: 0.95,
+        reasoning: 'System status, telemetry, or device vitals inspection command',
+      };
+    }
+
+    // H1. CHANGE VIDEO / NEXT SONG ("change video", "next video", "dusra video chalao", "next song", "agla gana")
+    if (
+      /(change\s*video|next\s*video|video\s*change|dusra\s*video|agla\s*video|video\s*badlo|next\s*song|agla\s*gana|dusra\s*gana|previous\s*video|pichla\s*video|अगला\s*वीडियो|दूसरा\s*वीडियो)/i.test(
+        target
+      )
+    ) {
+      return {
+        intent: 'change_video',
+        confidence: 0.98,
+        reasoning: 'Video or song track change request',
+      };
+    }
+
+    // H1.1 DOWNLOAD MEDIA ("download video", "download song", "video download karo", "gana download karo", "download audio")
+    if (
+      /(download\s*(video|audio|music|song|mp4|mp3|gana)|video\s*download|gana\s*download|song\s*download|डाउनलोड)/i.test(
+        target
+      )
+    ) {
+      return {
+        intent: 'download_media',
+        confidence: 0.98,
+        reasoning: 'Media video or audio download request',
+      };
+    }
+
+    // H1.2 AVATAR EMOTE CONTROL ("avatar smile", "smile karo", "happy emote", "avatar think", "avatar socho", "avatar nod")
+    if (
+      /(avatar\s*(smile|think|socho|nod|wave|serious|excited|confused|normal|hanso|hans)|smile\s*karo|happy\s*emote|thinking\s*emote|avatar\s*socho|nod\s*karo|wave\s*karo)/i.test(
+        target
+      )
+    ) {
+      return {
+        intent: 'avatar_emote',
+        confidence: 0.98,
+        reasoning: 'Avatar emotion/emote control directive',
+      };
+    }
+
+    // H2. STOP MUSIC ("Jarvis, stop music", "Jarvis, music band karo", "music roko", "gana band karo")
+    if (
+      /(stop\s+music|pause\s+music|stop\s+song|pause\s+song|stop\s+playing|music\s*(band|roko|pause|stop)|gana\s*(band|roko)|gaana\s*(band|roko)|song\s*(band|roko)|म्यूजिक\s*बंद|गाना\s*बंद)/i.test(
+        target
+      )
+    ) {
+      return {
+        intent: 'stop_music',
+        confidence: 0.98,
+        reasoning: 'Music playback cessation directive',
+      };
+    }
+
+    // H3. OPEN YOUTUBE ("Jarvis, open YouTube", "Jarvis, YouTube kholo", "open yt")
+    if (
+      /(open\s+youtube|youtube\s*(kholo|open|launch)|launch\s+youtube|open\s+yt|yt\s*kholo|यूट्यूब\s*(खोलो|ओपन))/i.test(
+        target
       ) &&
-      !/(weather|mausam|news|settings)/i.test(lower)
+      !/(search|play|dhundho|dhundo|songs?|gana|gaana|music|track|ke\s+songs?|video)/i.test(target)
+    ) {
+      return {
+        intent: 'open_youtube',
+        confidence: 0.98,
+        reasoning: 'Direct YouTube browser launch directive',
+      };
+    }
+
+    // H4. SEARCH YOUTUBE & PLAY MUSIC
+    // ("Jarvis, play Arijit Singh music", "Arijit Singh ke songs chalao", "search relaxing music on YouTube", "play Believer", "play music", "music chalao")
+    const isMusicOrYtCommand =
+      (/(youtube|music|song|songs|gana|gaana|track|audio|believer|arijit|spotify|संगीत|गाना)/i.test(target) &&
+        /(play|search|chalao|chala|bajao|baja|shuru|kholo|dhundho)/i.test(target)) ||
+      /(ke\s+songs?\s+(chalao|bajao|play))/i.test(target) ||
+      /^play\s+[a-z0-9]/i.test(target) ||
+      /^(music|gana|gaana)\s+(chalao|bajao|shuru)/i.test(target);
+
+    if (isMusicOrYtCommand) {
+      const isGenericMusic =
+        /^(play\s+music|music\s+chalao|gana\s+chalao|gaana\s+chalao|play\s+songs?|songs?\s+chalao|music\s+play\s+karo|music\s+shuru\s+karo|गाना\s*चलाओ|संगीत\s*चलाओ)$/i.test(
+          target.trim()
+        );
+
+      if (isGenericMusic) {
+        return {
+          intent: 'play_music',
+          confidence: 0.96,
+          reasoning: 'Generic music playback request without specific artist or song query',
+        };
+      } else {
+        return {
+          intent: 'search_youtube',
+          confidence: 0.96,
+          reasoning: 'Specific music or video search query on YouTube',
+        };
+      }
+    }
+
+    // D. COMPUTER ACTION REQUEST ("Jarvis, light chalao", "light on karo", "youtube kholo", "open chrome", "paise transfer kar do", "turn on wifi")
+    if (
+      /(kholo|open\s+|chalao|play\s+|turn\s+on|turn\s+off|band\s+karo|volume\s+|screenshot|transfer\s+money|paise\s+transfer|send\s+money|powershell|terminal|bash|shell|command|rm\s+-rf|shutdown|reboot|run\s+|light\s*(chalao|jalao|on|off|band|chala|dim)|lights?\s*(on|off)|लाइट\s*(चलाओ|जलाओ|ऑन|बंद|ऑफ))/i.test(
+        target
+      ) &&
+      !/(weather|mausam|news|settings)/i.test(target)
     ) {
       return {
         intent: 'COMPUTER_ACTION_REQUEST',
-        confidence: 0.9,
-        reasoning: 'App launch, playback, device control, or system execution command',
+        confidence: 0.92,
+        reasoning: 'Device control, lighting trigger, playback, or system action directive',
       };
     }
 
@@ -217,7 +339,7 @@ export class IntentDetector {
     // G. SETTINGS REQUEST ("theme change karo", "settings kholo", "open settings", "dark mode enable karo")
     if (
       /(settings?\s+kholo|open\s+settings?|change\s+theme|dark\s+mode|light\s+mode|change\s+language|bhasha\s+badlo|offline\s+mode\s+on)/i.test(
-        lower
+        target
       )
     ) {
       return {
@@ -227,23 +349,10 @@ export class IntentDetector {
       };
     }
 
-    // H. SYSTEM STATUS REQUEST ("battery percentage", "system status", "cpu usage", "battery kitni hai", "ram usage")
-    if (
-      /(battery|system\s+status|cpu\s+usage|ram\s+usage|disk\s+space|battery\s+kitni\s+hai)/i.test(
-        lower
-      )
-    ) {
-      return {
-        intent: 'SYSTEM_STATUS_REQUEST',
-        confidence: 0.92,
-        reasoning: 'Device telemetry or resource status query',
-      };
-    }
-
     // I. TASK REQUEST ("todo list mein add karo", "create a task", "ye task banao", "add to my tasks")
     if (
       /(todo\s+list|add\s+task|task\s+banao|task\s+add|task\s+mein\s+daal)/i.test(
-        lower
+        target
       )
     ) {
       return {
@@ -256,7 +365,7 @@ export class IntentDetector {
     // J. INFORMATION REQUEST ("bhai weather kya hai?", "mausam kaisa hai", "aaj ka temperature", "news kya hai")
     if (
       /(weather|mausam|temperature|baarish|rain|forecast|latest\s+news|samachar|stock\s+price|crypto\s+price)/i.test(
-        lower
+        target
       )
     ) {
       return {

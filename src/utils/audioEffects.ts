@@ -1,6 +1,6 @@
 /**
  * Web Audio API Acoustic Synthesizer
- * Provides realistic cinematic robotic and mechanical HUD sounds without external audio files.
+ * Provides realistic cinematic observatory and mechanical HUD sounds without external audio files.
  */
 
 import { AIStateMode } from '../types/index.ts';
@@ -171,6 +171,47 @@ class SoundSynthesizer {
     }
   }
 
+  public playSend() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(600, now);
+      osc.frequency.exponentialRampToValueAtTime(1400, now + 0.08);
+      gain.gain.setValueAtTime(0.04, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.08);
+    } catch {
+      // Ignore
+    }
+  }
+
+  public playHover() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, now);
+      gain.gain.setValueAtTime(0.015, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.02);
+    } catch {
+      // Ignore
+    }
+  }
+
   public playNotificationPing() {
     const ctx = this.getContext();
     if (!ctx) return;
@@ -188,6 +229,31 @@ class SoundSynthesizer {
         gain.connect(ctx.destination);
         osc.start(now + idx * 0.07);
         osc.stop(now + idx * 0.07 + 0.12);
+      });
+    } catch {
+      // Ignore
+    }
+  }
+
+  public playThemeWarp() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      // Ethereal celestial warp sweep
+      [220, 330, 440, 660].forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.02);
+        osc.frequency.exponentialRampToValueAtTime(freq * 1.45, now + idx * 0.02 + 0.35);
+        gain.gain.setValueAtTime(0.001, now + idx * 0.02);
+        gain.gain.linearRampToValueAtTime(0.035, now + idx * 0.02 + 0.06);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.02 + 0.55);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + idx * 0.02);
+        osc.stop(now + idx * 0.02 + 0.56);
       });
     } catch {
       // Ignore

@@ -46,7 +46,7 @@ export const ResearchPage: React.FC = () => {
               DEEP RESEARCH & SYNTHESIS
             </h2>
             <p className="text-xs text-zinc-400">
-              Autonomous kinetic kinematics • Lattice cryptography • High-density vectors
+              Planetary orbital astrophysics • Lattice telemetry • High-density ephemeris
             </p>
           </div>
         </div>
@@ -81,6 +81,19 @@ export const ResearchPage: React.FC = () => {
               <span>ANALYZE</span>
             </>
           )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            const q = topic.trim() || 'Solar System planetary orbits astrophysics';
+            window.open(`https://www.google.com/search?q=${encodeURIComponent(q)}`, '_blank', 'noopener,noreferrer');
+          }}
+          className="px-3 py-1.5 bg-cyan-950/70 border border-cyan-700/80 hover:bg-cyan-900 text-cyan-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+          title="Direct Google Search"
+        >
+          <Search className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">GOOGLE SEARCH</span>
         </button>
       </form>
 

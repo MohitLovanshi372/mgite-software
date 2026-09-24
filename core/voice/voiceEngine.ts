@@ -21,10 +21,12 @@ import {
   VoiceConfig,
   VoiceConfiguration,
   SpeechVoice,
+  SpeakOptions,
 } from './types.ts';
 import { WebSpeechSTTProvider, WebSpeechTTSProvider } from './webSpeechProvider.ts';
 import { MockSpeechToTextProvider, MockTextToSpeechProvider } from './mockSpeechProvider.ts';
 import { TTSRouter } from './ttsRouter.ts';
+import { SpeechTextNormalizer, SpeechNormalizationResult } from './speechTextNormalizer.ts';
 import { PrivacyFilter } from '../security/privacyFilter.ts';
 import { getConfig } from '../../config/settings.ts';
 import { logger } from '../logger.ts';
@@ -43,6 +45,9 @@ export class VoiceEngine {
   private stuckStateTimer: NodeJS.Timeout | null = null;
   private customConfig?: Partial<VoiceConfig>;
   private lastSpokenText: string = '';
+  private lastOriginalResponse: string = '';
+  private lastNormalizedSpeechText: string = '';
+  private lastNormalizationResult: SpeechNormalizationResult | null = null;
 
   constructor(
     configOrStt?: Partial<VoiceConfig> | SpeechToTextProvider,
@@ -362,16 +367,7 @@ export class VoiceEngine {
    */
   public async speak(
     text: string,
-    options?:
-      | string
-      | {
-          voiceId?: string;
-          rate?: number;
-          volume?: number;
-          lang?: string;
-          onStart?: () => void;
-          onEnd?: () => void;
-        }
+    options?: string | SpeakOptions
   ): Promise<{ success: boolean; text: string; state: 'COMPLETED' | 'ERROR'; message?: string }> {
     const config = this.getConfig();
     if (!config.enabled) {
@@ -409,15 +405,24 @@ export class VoiceEngine {
       textToSpeak = 'Sensitive credentials detected. Per security policy, sensitive credentials cannot be read aloud.';
     }
 
-    this.lastSpokenText = textToSpeak;
+    // Step: Speech Text Normalization Layer
+    const normResult = SpeechTextNormalizer.normalize(textToSpeak, {
+      targetLanguageMode: opts?.lang === 'hi' || opts?.lang === 'hi-IN' ? 'HINDI' : undefined,
+    });
+    const finalSpeechText = normResult.normalizedText || textToSpeak;
+
+    this.lastOriginalResponse = text;
+    this.lastNormalizedSpeechText = finalSpeechText;
+    this.lastNormalizationResult = normResult;
+    this.lastSpokenText = finalSpeechText;
     this.setState('SPEAKING');
 
     try {
-      await this.ttsProvider.speak(textToSpeak, {
+      await this.ttsProvider.speak(finalSpeechText, {
         voiceId: opts?.voiceId || config.voice_id,
         rate: opts?.rate ?? config.speech_rate,
         volume: opts?.volume ?? config.speech_volume,
-        lang: opts?.lang || config.preferred_language,
+        lang: opts?.lang || (normResult.languageCode === 'hi' ? 'hi-IN' : config.preferred_language),
         onStart: () => {
           if (opts?.onStart) opts.onStart();
         },
@@ -436,7 +441,7 @@ export class VoiceEngine {
       if (this.state === 'SPEAKING') {
         this.setState('IDLE');
       }
-      return { success: true, text: textToSpeak, state: 'COMPLETED' };
+      return { success: true, text: finalSpeechText, state: 'COMPLETED' };
     } catch (err: any) {
       this.setState('ERROR', err.message);
       this.emitError(err);
@@ -445,6 +450,17 @@ export class VoiceEngine {
       }
       throw err;
     }
+  }
+
+  /**
+   * Retrieves debug preview payload showing original vs normalized speech text
+   */
+  public getNormalizationDebug() {
+    return {
+      originalResponse: this.lastOriginalResponse,
+      normalizedSpeechText: this.lastNormalizedSpeechText,
+      normalizationResult: this.lastNormalizationResult,
+    };
   }
 
   /**

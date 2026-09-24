@@ -46,6 +46,14 @@ export interface VoiceConfiguration {
   elevenlabsVoiceId?: string;
   elevenlabs_model?: string;
   elevenlabsModel?: string;
+  elevenlabs_stability?: number;
+  elevenlabsStability?: number;
+  elevenlabs_similarity_boost?: number;
+  elevenlabsSimilarityBoost?: number;
+  elevenlabs_style?: number;
+  elevenlabsStyle?: number;
+  elevenlabs_pitch?: number;
+  elevenlabsPitch?: number;
 }
 
 export type VoiceConfig = VoiceConfiguration;
@@ -84,6 +92,10 @@ export interface SpeakOptions {
   rate?: number;
   volume?: number;
   lang?: string;
+  stability?: number;
+  style?: number;
+  similarityBoost?: number;
+  pitch?: number;
   onStart?: () => void;
   onEnd?: () => void;
   onError?: (err: Error) => void;

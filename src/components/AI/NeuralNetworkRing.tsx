@@ -1,7 +1,7 @@
 /**
  * NeuralNetworkRing Component
  *
- * High-performance, lightweight robotic neural network ring with mechanical HUD geometry.
+ * High-performance, lightweight celestial neural network ring with mechanical HUD geometry.
  *
  * Performance Architecture:
  * - Uses requestAnimationFrame (rAF) directly via a dedicated high-efficiency canvas/SVG hybrid
@@ -32,7 +32,19 @@ interface SynapseNode {
   size: number;
   phase: number;
   tier: 'outer' | 'mid' | 'inner';
+  starColor: string;
+  glowColor: string;
 }
+
+const STAR_PALETTES = [
+  { color: '#38bdf8', glow: 'rgba(56, 189, 248, 0.9)' },  // Cyan
+  { color: '#c084fc', glow: 'rgba(192, 132, 252, 0.9)' }, // Violet
+  { color: '#f43f5e', glow: 'rgba(244, 63, 94, 0.9)' },   // Ruby
+  { color: '#34d399', glow: 'rgba(52, 211, 153, 0.9)' },  // Emerald
+  { color: '#fbbf24', glow: 'rgba(251, 191, 36, 0.9)' },  // Amber
+  { color: '#f472b6', glow: 'rgba(244, 114, 182, 0.9)' }, // Magenta
+  { color: '#67e8f9', glow: 'rgba(103, 232, 249, 0.9)' }, // Electric cyan
+];
 
 export const NeuralNetworkRing: React.FC<NeuralNetworkRingProps> = ({
   state,
@@ -84,32 +96,47 @@ export const NeuralNetworkRing: React.FC<NeuralNetworkRingProps> = ({
     ? 'rgba(249, 115, 22, 0.45)'
     : 'rgba(220, 38, 38, 0.28)';
 
-  // Static procedural node definitions (outer: 12, mid: 8, inner: 6)
+  // Static procedural node definitions (outer: 12, mid: 8, inner: 6) with spectral star colors
   const nodes: SynapseNode[] = [
-    // 12 Outer nodes
-    ...Array.from({ length: 12 }).map((_, i) => ({
-      baseAngle: (i / 12) * Math.PI * 2,
-      radius: 240,
-      size: i % 3 === 0 ? 4.5 : 3,
-      phase: i * 0.4,
-      tier: 'outer' as const,
-    })),
-    // 8 Mid cluster nodes
-    ...Array.from({ length: 8 }).map((_, i) => ({
-      baseAngle: (i / 8) * Math.PI * 2 + Math.PI / 8,
-      radius: 180,
-      size: i % 2 === 0 ? 5 : 3.5,
-      phase: i * 0.6 + 1.0,
-      tier: 'mid' as const,
-    })),
-    // 6 Inner core nodes
-    ...Array.from({ length: 6 }).map((_, i) => ({
-      baseAngle: (i / 6) * Math.PI * 2,
-      radius: 120,
-      size: 4,
-      phase: i * 0.8 + 2.0,
-      tier: 'inner' as const,
-    })),
+    // 12 Outer celestial nodes
+    ...Array.from({ length: 12 }).map((_, i) => {
+      const pal = STAR_PALETTES[i % STAR_PALETTES.length];
+      return {
+        baseAngle: (i / 12) * Math.PI * 2,
+        radius: 240,
+        size: i % 3 === 0 ? 5 : 3.5,
+        phase: i * 0.4,
+        tier: 'outer' as const,
+        starColor: pal.color,
+        glowColor: pal.glow,
+      };
+    }),
+    // 8 Mid cluster celestial nodes
+    ...Array.from({ length: 8 }).map((_, i) => {
+      const pal = STAR_PALETTES[(i + 2) % STAR_PALETTES.length];
+      return {
+        baseAngle: (i / 8) * Math.PI * 2 + Math.PI / 8,
+        radius: 180,
+        size: i % 2 === 0 ? 5.5 : 4,
+        phase: i * 0.6 + 1.0,
+        tier: 'mid' as const,
+        starColor: pal.color,
+        glowColor: pal.glow,
+      };
+    }),
+    // 6 Inner core celestial nodes
+    ...Array.from({ length: 6 }).map((_, i) => {
+      const pal = STAR_PALETTES[(i + 4) % STAR_PALETTES.length];
+      return {
+        baseAngle: (i / 6) * Math.PI * 2,
+        radius: 120,
+        size: 4.5,
+        phase: i * 0.8 + 2.0,
+        tier: 'inner' as const,
+        starColor: pal.color,
+        glowColor: pal.glow,
+      };
+    }),
   ];
 
   // High-performance requestAnimationFrame loop with direct DOM mutation (zero React re-renders)
@@ -229,15 +256,19 @@ export const NeuralNetworkRing: React.FC<NeuralNetworkRingProps> = ({
               const jitterX = executing ? (Math.random() - 0.5) * 6 : 0;
               const jitterY = executing ? (Math.random() - 0.5) * 6 : 0;
 
+              // Chromatic spectral gradient for each wave conduit
+              const pal = STAR_PALETTES[i % STAR_PALETTES.length];
+              ctx.strokeStyle = isAlert ? 'rgba(239, 68, 68, 0.7)' : pal.glow;
+
               ctx.beginPath();
               ctx.moveTo(cx, cy);
               ctx.lineTo(nx + jitterX, ny + jitterY);
               ctx.stroke();
 
-              // Pulsing node glow dot on canvas
-              ctx.fillStyle = thinking ? '#f97316' : '#ef4444';
+              // Pulsing celestial star node glow dot on canvas
+              ctx.fillStyle = isAlert ? '#ef4444' : pal.color;
               ctx.beginPath();
-              const dotSize = 3 + Math.sin(pulseTime * pulseFreq + i) * 1.5;
+              const dotSize = 3.5 + Math.sin(pulseTime * pulseFreq + i) * 1.8;
               ctx.arc(nx + jitterX, ny + jitterY, Math.max(1.5, dotSize), 0, Math.PI * 2);
               ctx.fill();
             }
@@ -369,8 +400,16 @@ export const NeuralNetworkRing: React.FC<NeuralNetworkRingProps> = ({
                     cx={x}
                     cy={y}
                     r={node.size}
-                    fill={secondaryColor}
+                    fill={isAlert ? secondaryColor : node.starColor}
                     filter="url(#nn-glow)"
+                  />
+                  {/* Subtle Star Core Pin */}
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r={node.size * 0.45}
+                    fill="#ffffff"
+                    opacity="0.9"
                   />
                 </g>
               );
@@ -524,8 +563,15 @@ export const NeuralNetworkRing: React.FC<NeuralNetworkRingProps> = ({
                     cx={x}
                     cy={y}
                     r={node.size}
-                    fill={secondaryColor}
+                    fill={isAlert ? secondaryColor : node.starColor}
                     filter="url(#nn-glow)"
+                  />
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r={node.size * 0.45}
+                    fill="#ffffff"
+                    opacity="0.9"
                   />
                 </g>
               );

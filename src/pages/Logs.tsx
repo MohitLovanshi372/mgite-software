@@ -26,7 +26,7 @@ export const LogsPage: React.FC = () => {
         'Acoustic waveform synthesized: zero distortion.',
         'Local SQLite WAL write locked: 0 dirty buffers.',
         'Airgap sentinel inspected socket buffer: zero egress leaks.',
-        'Robotic facial plate kinematics nominal (60 FPS).',
+        'Planetary ephemeris telemetry stream nominal (60 FPS).',
         'Neural weights locked in high-speed NPU cache.',
       ];
 

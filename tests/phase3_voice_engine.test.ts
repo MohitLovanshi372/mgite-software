@@ -235,7 +235,8 @@ export async function runPhase3VoiceEngineTests(): Promise<void> {
       conversation_id: 'test-hinglish-voice',
       user_message: transcript,
       input_mode: 'voice',
-    });
+      isOfflineMode: true,
+    } as any);
 
     assert(response.content.length > 0, 'Orchestrator should process Hinglish voice query');
     assert(response.intent?.intent === 'REMINDER_REQUEST', `Expected REMINDER_REQUEST, got: ${response.intent?.intent}`);
@@ -421,7 +422,8 @@ export async function runPhase3VoiceEngineTests(): Promise<void> {
       conversation_id: 'test-auto-speak-off',
       user_message: 'Hi there',
       input_mode: 'voice',
-    });
+      isOfflineMode: true,
+    } as any);
 
     assert(response.content.length > 0, 'Assistant should return text response');
     // In auto-speak disabled, caller simply does not invoke TTS
@@ -441,7 +443,8 @@ export async function runPhase3VoiceEngineTests(): Promise<void> {
       conversation_id: 'test-auto-speak-on',
       user_message: 'Hello, what is your name?',
       input_mode: 'voice',
-    });
+      isOfflineMode: true,
+    } as any);
 
     assert(response.content.length > 0, 'Response generated');
 

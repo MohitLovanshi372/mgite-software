@@ -29,7 +29,6 @@ interface RightPanelProps {
   onClose?: () => void;
   notificationPulseKey?: number;
   latestNotification?: NotificationItem | null;
-  onTriggerTestNotification?: () => void;
 }
 
 export const RightPanel: React.FC<RightPanelProps> = ({
@@ -37,7 +36,6 @@ export const RightPanel: React.FC<RightPanelProps> = ({
   onClose,
   notificationPulseKey = 0,
   latestNotification,
-  onTriggerTestNotification,
 }) => {
   const [isPulsing, setIsPulsing] = useState(false);
   const isInitialMount = useRef(true);
@@ -109,7 +107,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
               mass: 0.85,
             }
       }
-      className="w-72 lg:w-80 bg-[#07080c]/95 border-l border-zinc-800/90 flex flex-col h-full z-20 shrink-0 font-mono select-none overflow-y-auto custom-scrollbar p-3 space-y-3 relative"
+      className="w-72 lg:w-80 bg-[#07080c]/85 backdrop-blur-md border-l border-zinc-800/80 flex flex-col h-full z-20 shrink-0 font-mono select-none overflow-y-auto custom-scrollbar p-3 space-y-3 relative"
     >
       {/* Top Header Bar with status & controls */}
       <div className="flex items-center justify-between pb-2 border-b border-zinc-800/80">
@@ -126,19 +124,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
         </div>
 
         <div className="flex items-center gap-1">
-          {/* Quick Notification Pulse Test Trigger */}
-          {onTriggerTestNotification && (
-            <button
-              onClick={onTriggerTestNotification}
-              title="Dispatch test notification to pulse panel"
-              className="px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 hover:border-red-600/70 text-zinc-400 hover:text-red-400 text-[9px] rounded-xs transition-colors flex items-center gap-1 cursor-pointer"
-            >
-              <Bell className="w-2.5 h-2.5 text-red-500" />
-              <span>TEST PING</span>
-            </button>
-          )}
-
-          {/* Close / Collapse button to test exit animation */}
+          {/* Close / Collapse button */}
           {onClose && (
             <button
               onClick={onClose}

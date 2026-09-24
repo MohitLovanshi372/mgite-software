@@ -1,5 +1,5 @@
 /**
- * ULTRON Core Robotic AI OS - Realistic Mock Data
+ * ULTRON Solar System & Astronomical AI OS - Realistic Mock Data
  */
 
 import {
@@ -115,10 +115,10 @@ export const initialCalendarEvents: CalendarEvent[] = [
 export const initialResearchBriefs: ResearchBrief[] = [
   {
     id: 'res-1',
-    title: 'Autonomous Kinetic Actuation via On-Device Low-Latency Controllers',
-    source: 'Ultron Mechanical Engineering Archive',
+    title: 'Hardware-Accelerated 3D GLB Mesh Telemetry & PBR Rendering',
+    source: 'Ultron Graphics Matrix',
     confidence: '99.4%',
-    summary: 'Direct bus communication between robotic servomotors and localized neural cores yields 0.8ms control loop responsiveness without cloud dependency.',
+    summary: 'Direct WebGL GPU integration between GLTF binary mesh loaders and localized PBR shaders yields 60 FPS polygon inspection without cloud latency.',
     timestamp: '12:31',
     classification: 'RESTRICTED',
   },
@@ -153,7 +153,7 @@ export const initialDocuments: DocumentItem[] = [
   },
   {
     id: 'doc-2',
-    name: 'ROBOTIC_NEURAL_BUS_PINOUTS.bin',
+    name: 'CELESTIAL_EPHEMERIS_MATRIX.bin',
     size: '3.8 MB',
     entropy: '8.00',
     type: 'BINARY',
@@ -216,7 +216,7 @@ export const initialApplications: ApplicationBridge[] = [
   },
   {
     id: 'app-5',
-    name: 'ROBOTIC_KINEMATICS_SIM',
+    name: 'SOLAR_ORBITAL_PHYSICS_SIM',
     category: 'Physics Rig',
     status: 'STANDBY',
     pids: 3,

@@ -175,7 +175,7 @@ export function normalizeAIError(err: unknown, provider: string): AIError {
       message: `${provider} network connection unreachable.`,
       provider,
       isRetryable: true,
-      userMessage: 'Internet connection unavailable hai. Main abhi offline mode mein operate kar raha hoon.',
+      userMessage: 'Internet connection unavailable hai. Main abhi offline mode mein operate kar rahi hoon.',
       cause: err,
     });
   }

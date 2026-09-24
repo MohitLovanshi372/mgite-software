@@ -21,6 +21,8 @@ import {
   Cpu,
   Settings,
   Flame,
+  Box,
+  Sparkles,
 } from 'lucide-react';
 import { NavigationPageId } from '../../types/index.ts';
 
@@ -40,29 +42,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
   badgeCounts,
 }) => {
   const navItems: { id: NavigationPageId; label: string; icon: any; badge?: number }[] = [
-    { id: 'command_center', label: 'COMMAND CENTER', icon: ShieldAlert },
-    { id: 'intelligence', label: 'INTELLIGENCE', icon: Brain },
-    { id: 'memory', label: 'MEMORY', icon: Database, badge: badgeCounts?.memory },
-    { id: 'tasks', label: 'TASKS', icon: CheckSquare, badge: badgeCounts?.tasks },
-    { id: 'calendar', label: 'CALENDAR', icon: Calendar },
-    { id: 'research', label: 'RESEARCH', icon: Search },
-    { id: 'documents', label: 'DOCUMENTS', icon: FileText },
-    { id: 'applications', label: 'APPLICATIONS', icon: Grid },
-    { id: 'notifications', label: 'NOTIFICATIONS', icon: Bell, badge: badgeCounts?.notifications },
+    { id: 'command_center', label: 'COMMAND MATRIX', icon: Flame },
+    { id: 'glb_studio', label: '3D GLB STUDIO', icon: Box },
+    { id: 'galaxy_view', label: 'ULTRON GALAXY', icon: Sparkles },
+    { id: 'intelligence', label: 'INTELLIGENCE & GESTURES', icon: Brain },
     { id: 'system_control', label: 'SYSTEM CONTROL', icon: Sliders },
-    { id: 'network', label: 'NETWORK', icon: Wifi },
-    { id: 'logs', label: 'LOGS', icon: Terminal },
-    { id: 'architecture', label: 'ARCHITECTURE', icon: Cpu },
-    { id: 'settings', label: 'SETTINGS', icon: Settings },
+    { id: 'settings', label: 'SETTINGS & HUD (⚙)', icon: Settings },
   ];
 
   return (
-    <aside className="w-56 lg:w-64 bg-[#07080c]/95 border-r border-zinc-800/90 flex flex-col justify-between select-none font-mono shrink-0 h-full z-20">
+    <aside className="w-56 lg:w-64 bg-[#07080c]/85 backdrop-blur-md border-r border-zinc-800/80 flex flex-col justify-between select-none font-mono shrink-0 h-full z-20">
       {/* Navigation list */}
       <div className="flex-1 py-3 px-2 overflow-y-auto custom-scrollbar space-y-1">
         <div className="px-2.5 pb-2 text-[9px] font-bold text-zinc-300 tracking-widest uppercase flex items-center justify-between">
-          <span>NAVIGATION MATRIX</span>
-          <span className="text-red-500">14 NODES</span>
+          <span>CORE NAVIGATION</span>
+          <span className="text-red-500 font-bold">5 NODES</span>
         </div>
 
         {navItems.map((item) => {

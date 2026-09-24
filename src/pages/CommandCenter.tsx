@@ -1,22 +1,26 @@
 /**
  * CommandCenter Page
- * Central stage of the robotic AI operating system:
- * - Left: Directive Panel ("HELLO, HUMAN. I AM YOUR AI SYSTEM...")
- * - Center: Large 3D Robotic AI Core & Face with Three.js
- * - Realtime Optical Camera Hand Gesture HUD (Learn through hand gestures)
- * - Bottom Center: AI State Selector (IDLE, LISTENING, THINKING, EXECUTING, SPEAKING, SUCCESS, ERROR, ALERT)
- * - Response Speech Box & Acoustic Equalizer
+ *
+ * Central stage of JARVIS Desktop AI Command Center matching reference image:
+ * - Direct 3D Avatar Centerpiece with /models/jarvis-human.glb
+ * - Centered framing, celestial galaxy & observation deck backdrop
+ * - Dynamic floating status speech card
+ * - Optical HUD gesture sensor support
  */
 
-import React from 'react';
-import { AICore } from '../components/AI/AICore.tsx';
-import { AIState } from '../components/AI/AIState.tsx';
-import { DirectivePanel } from '../components/Dashboard/DirectivePanel.tsx';
+import React, { useState, useEffect } from 'react';
+import { JarvisAvatarCenterpiece } from '../components/Avatar/JarvisAvatarCenterpiece.tsx';
+import { ReactorCoreCanvas } from '../components/HUD/ReactorCoreCanvas.tsx';
+import { UltronGalaxy3D } from '../components/Galaxy/UltronGalaxy3D.tsx';
 import { CameraGestureHUD } from '../components/Gestures/CameraGestureHUD.tsx';
+import { YouTubeFullPlayer } from '../components/Media/YouTubeFullPlayer.tsx';
+import { youtubePlayerService } from '../utils/youtubePlayerService.ts';
+import { AvatarEmotion } from '../avatar/types.ts';
 import { AIStateMode } from '../types/index.ts';
 import { LearnedGesture } from '../types/gestures.ts';
-import { Volume2, Play, Activity } from 'lucide-react';
-import { ultronVoice } from '../utils/ultronVoice.ts';
+import { User, Cpu, Sparkles, Camera, CameraOff, Youtube } from 'lucide-react';
+
+export type StageViewportMode = 'jarvis_avatar' | 'reactor_hud' | 'galaxy_3d' | 'youtube_player';
 
 interface CommandCenterProps {
   avatarState: AIStateMode;
@@ -24,6 +28,8 @@ interface CommandCenterProps {
   lastAssistantMessage: string;
   interimTranscript: string;
   onGestureTrigger?: (gesture: LearnedGesture) => void;
+  controlledEmote?: AvatarEmotion | null;
+  onEmoteChange?: (emote: AvatarEmotion) => void;
 }
 
 export const CommandCenter: React.FC<CommandCenterProps> = ({
@@ -32,7 +38,20 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
   lastAssistantMessage,
   interimTranscript,
   onGestureTrigger,
+  controlledEmote,
+  onEmoteChange,
 }) => {
+  const [viewportMode, setViewportMode] = useState<StageViewportMode>('jarvis_avatar');
+  const [showOpticalHUD, setShowOpticalHUD] = useState<boolean>(false);
+  const [isMediaPlaying, setIsMediaPlaying] = useState<boolean>(youtubePlayerService.getState().isPlaying);
+
+  useEffect(() => {
+    const unsub = youtubePlayerService.subscribe((s) => {
+      setIsMediaPlaying(s.isPlaying);
+    });
+    return () => unsub();
+  }, []);
+
   const handleGestureDetected = (gesture: LearnedGesture) => {
     if (gesture.mappedState) {
       onAvatarStateChange(gesture.mappedState);
@@ -43,94 +62,122 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#040508] bg-tech-grid relative overflow-y-auto custom-scrollbar p-3 sm:p-4 gap-4 justify-between">
-      {/* Subtle Scanlines overlay */}
-      <div className="absolute inset-0 bg-scanlines opacity-25 pointer-events-none z-10" />
+    <div className="w-full h-full flex flex-col relative overflow-hidden select-none">
+      {/* Subtle top mode toolbar (compact and unobtrusive) */}
+      <div className="absolute top-3 right-4 z-30 flex items-center gap-2 bg-[#091122]/75 backdrop-blur-md px-2.5 py-1 rounded-full border border-blue-500/20 text-xs">
+        <button
+          type="button"
+          onClick={() => setViewportMode('jarvis_avatar')}
+          className={`px-2.5 py-1 rounded-full text-[11px] font-sans transition-all cursor-pointer flex items-center gap-1.5 ${
+            viewportMode === 'jarvis_avatar'
+              ? 'bg-blue-600 text-white font-semibold shadow-[0_0_10px_rgba(37,99,235,0.5)]'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <User className="w-3 h-3" />
+          <span>AVATAR</span>
+        </button>
 
-      {/* Main Center Stage: Left Directive Panel + Center Robotic Core */}
-      <div className="flex-1 flex flex-col xl:flex-row items-center justify-center gap-4 relative z-10 my-auto">
-        {/* Left Information Panel */}
-        <div className="w-full xl:w-auto flex justify-center shrink-0">
-          <DirectivePanel state={avatarState} />
-        </div>
+        <button
+          type="button"
+          onClick={() => setViewportMode('reactor_hud')}
+          className={`px-2.5 py-1 rounded-full text-[11px] font-sans transition-all cursor-pointer flex items-center gap-1.5 ${
+            viewportMode === 'reactor_hud'
+              ? 'bg-blue-600 text-white font-semibold shadow-[0_0_10px_rgba(37,99,235,0.5)]'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Cpu className="w-3 h-3" />
+          <span>REACTOR</span>
+        </button>
 
-        {/* Central Robotic AI Core */}
-        <div className="flex-1 w-full max-w-2xl flex flex-col items-center justify-center relative">
-          <AICore state={avatarState} />
+        <button
+          type="button"
+          onClick={() => setViewportMode('galaxy_3d')}
+          className={`px-2.5 py-1 rounded-full text-[11px] font-sans transition-all cursor-pointer flex items-center gap-1.5 ${
+            viewportMode === 'galaxy_3d'
+              ? 'bg-blue-600 text-white font-semibold shadow-[0_0_10px_rgba(37,99,235,0.5)]'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Sparkles className="w-3 h-3" />
+          <span>GALAXY</span>
+        </button>
 
-          {/* Speech Bubble / Live Speech Output HUD */}
-          <div className="w-full max-w-xl bg-[#090a10]/95 border border-red-950 p-3 rounded-xs backdrop-blur-md mt-1 shadow-lg relative">
-            <div className="flex items-center justify-between absolute -top-2 left-4 right-4">
-              <span className="text-[9px] font-mono px-2 py-0.2 bg-red-950 border border-red-500/60 text-red-400 font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-[0_0_8px_rgba(220,38,38,0.3)]">
-                <Volume2 className="w-3 h-3 text-red-400" />
-                ULTRON ACOUSTIC SYNTHESIZER // 74Hz SUB-BASS
-              </span>
+        <button
+          type="button"
+          onClick={() => setViewportMode('youtube_player')}
+          className={`px-2.5 py-1 rounded-full text-[11px] font-sans transition-all cursor-pointer flex items-center gap-1.5 ${
+            viewportMode === 'youtube_player'
+              ? 'bg-red-600 text-white font-semibold shadow-[0_0_10px_rgba(239,68,68,0.5)]'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Youtube className="w-3 h-3 text-red-400" />
+          <span>YOUTUBE</span>
+          {isMediaPlaying && (
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-ping" />
+          )}
+        </button>
 
-              {/* Quick Audio Controls */}
-              <div className="flex items-center gap-1 bg-[#0a0c12] border border-zinc-800 px-1 py-0.5 rounded-xs">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (lastAssistantMessage) {
-                      ultronVoice.speak(lastAssistantMessage);
-                    }
-                  }}
-                  title="Replay Ultron Voice"
-                  className="px-1.5 py-0.5 hover:bg-red-950 text-zinc-400 hover:text-red-400 text-[9px] font-mono flex items-center gap-1 transition-colors cursor-pointer"
-                >
-                  <Play className="w-2.5 h-2.5 fill-current" />
-                  <span>REPLAY</span>
-                </button>
-              </div>
-            </div>
+        <div className="w-[1px] h-3.5 bg-blue-900/60 mx-0.5" />
 
-            <p className="text-xs sm:text-sm font-mono text-zinc-200 leading-relaxed pt-2">
-              {interimTranscript ? (
-                <span className="text-red-400 font-bold animate-pulse">
-                  &gt; [ACOUSTIC INGEST]: {interimTranscript}
-                </span>
-              ) : (
-                <span>&gt; {lastAssistantMessage}</span>
-              )}
-            </p>
+        <button
+          type="button"
+          onClick={() => setShowOpticalHUD((prev) => !prev)}
+          title={showOpticalHUD ? 'Hide Optical Camera HUD' : 'Enable Optical Gesture Sensor'}
+          className={`p-1 rounded-full transition-colors cursor-pointer ${
+            showOpticalHUD
+              ? 'text-cyan-400 bg-cyan-950/60 border border-cyan-500/40'
+              : 'text-slate-500 hover:text-slate-300'
+          }`}
+        >
+          {showOpticalHUD ? <Camera className="w-3 h-3" /> : <CameraOff className="w-3 h-3" />}
+        </button>
+      </div>
 
-            {/* Realtime Vocalizer Waveform when SPEAKING */}
-            {avatarState === 'SPEAKING' && (
-              <div className="flex items-center gap-1 pt-2 mt-2 border-t border-red-950/60">
-                <Activity className="w-3 h-3 text-red-500 animate-spin" />
-                <span className="text-[9px] font-mono text-red-400 font-bold tracking-widest uppercase">
-                  ACTIVE RESONANCE MATRIX:
-                </span>
-                <div className="flex items-center gap-0.5 h-3 flex-1 justify-end">
-                  {[6, 14, 22, 10, 26, 18, 12, 28, 16, 20, 8, 24].map((h, i) => (
-                    <span
-                      key={i}
-                      className="w-1 bg-red-500 rounded-full animate-pulse shadow-[0_0_4px_#ef4444]"
-                      style={{
-                        height: `${h}px`,
-                        animationDuration: `${0.2 + (i % 3) * 0.15}s`,
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
+      {/* Main Center Viewport */}
+      <div className="w-full h-full flex-1 relative overflow-hidden rounded-2xl">
+        {viewportMode === 'jarvis_avatar' && (
+          <JarvisAvatarCenterpiece
+            avatarState={avatarState}
+            lastAssistantMessage={lastAssistantMessage}
+            interimTranscript={interimTranscript}
+            controlledEmote={controlledEmote}
+            onEmoteChange={onEmoteChange}
+            isMusicPlaying={isMediaPlaying}
+          />
+        )}
+
+        {viewportMode === 'youtube_player' && (
+          <div className="w-full h-full p-4 overflow-y-auto bg-[#050a16] rounded-2xl border border-red-500/30">
+            <YouTubeFullPlayer className="max-w-4xl mx-auto" />
           </div>
+        )}
+
+        {viewportMode === 'reactor_hud' && (
+          <div className="w-full h-full flex items-center justify-center bg-[#060b18] rounded-2xl border border-blue-500/25">
+            <ReactorCoreCanvas
+              avatarState={avatarState}
+              themeColor="#00d2ff"
+              className="w-full h-full"
+            />
+          </div>
+        )}
+
+        {viewportMode === 'galaxy_3d' && (
+          <div className="w-full h-full relative rounded-2xl border border-blue-500/25 overflow-hidden">
+            <UltronGalaxy3D />
+          </div>
+        )}
+      </div>
+
+      {/* Optical Camera Gesture HUD Overlay (if toggled on) */}
+      {showOpticalHUD && (
+        <div className="absolute bottom-4 right-4 z-30 w-64 rounded-xl overflow-hidden border border-cyan-500/40 shadow-2xl bg-[#060b18]/90">
+          <CameraGestureHUD onGestureTrigger={handleGestureDetected} currentAIState={avatarState} />
         </div>
-      </div>
-
-      {/* Optical Camera Gesture HUD & Learning Lab */}
-      <div className="w-full max-w-5xl mx-auto relative z-10">
-        <CameraGestureHUD
-          onGestureTrigger={handleGestureDetected}
-          currentAIState={avatarState}
-        />
-      </div>
-
-      {/* State Mode Selector Bar */}
-      <div className="w-full max-w-3xl mx-auto pt-1 relative z-10">
-        <AIState currentState={avatarState} onStateSelect={onAvatarStateChange} />
-      </div>
+      )}
     </div>
   );
 };

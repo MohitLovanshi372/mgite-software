@@ -12,15 +12,20 @@
     "lint": "tsc --noEmit",
     "test": "tsx tests/run_tests.ts",
     "test:unit": "tsx tests/gemini_provider.unit.test.ts",
-    "test:privacy": "tsx tests/step4_privacy_filter.test.ts"
+    "test:privacy": "tsx tests/step4_privacy_filter.test.ts",
+    "test:female-voice": "tsx tests/validate_female_hindi_grammar.test.ts",
+    "test:avatar-youtube": "tsx tests/avatar_emotes_youtube_download.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
+    "@mediapipe/tasks-vision": "^1.0.1",
     "@react-three/drei": "^10.7.8",
     "@react-three/fiber": "^9.7.0",
     "@tailwindcss/vite": "^4.1.14",
+    "@types/d3": "^7.4.3",
     "@types/three": "^0.185.4",
     "@vitejs/plugin-react": "^5.0.4",
+    "d3": "^7.9.0",
     "dotenv": "^17.2.3",
     "elevenlabs": "^1.59.0",
     "express": "^4.21.2",

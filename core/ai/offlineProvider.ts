@@ -84,9 +84,9 @@ Aapka local assistant tayyar hai. Cloud AI ya web research ke liye internet conn
     // 4. Greetings in English, Hindi, and Hinglish
     if (/^(hi|hello|hey|namaste|pranam|namashkar|kya hal hai|kaise ho)\b/i.test(query)) {
       return {
-        text: `Namaste! Main JARVIS hoon, aapka personal assistant.
-Abhi main Offline Mode mein chal raha hoon. Local memory aur settings active hain.
-Internet ke bina abhi main full AI response generate nahi kar sakta, lekin aap status aur memory inspect kar sakte hain.`,
+        text: `Namaste! Main JARVIS hoon, aapki personal assistant.
+Abhi main Offline Mode mein chal rahi hoon. Local memory aur settings active hain.
+Internet ke bina abhi main full AI response generate nahi kar sakti, lekin aap status aur memory inspect kar sakte hain.`,
         provider: this.id,
         model: 'local-rules-engine',
         isOffline: true,
@@ -103,7 +103,7 @@ Internet ke bina abhi main full AI response generate nahi kar sakta, lekin aap s
       query.includes('aaj')
     ) {
       return {
-        text: 'Internet ke bina abhi main full AI response generate nahi kar sakta. Live web search ya weather ke liye active internet connection ki zaroorat hogi.',
+        text: 'Internet ke bina abhi main full AI response generate nahi kar sakti. Live web search ya weather ke liye active internet connection ki zaroorat hogi.',
         provider: this.id,
         model: 'local-rules-engine',
         isOffline: true,
@@ -112,13 +112,13 @@ Internet ke bina abhi main full AI response generate nahi kar sakta, lekin aap s
 
     // 6. Default honest offline fallback
     return {
-      text: `Internet ke bina abhi main full AI response generate nahi kar sakta.
+      text: `Internet ke bina abhi main full AI response generate nahi kar sakti.
 Aapka message receive ho gaya hai: "${prompt}".
 Full AI generation ke liye internet connection aur active Gemini service ki zaroorat hogi.`,
-      provider: this.id,
-      model: 'local-rules-engine',
-      isOffline: true,
-    };
+        provider: this.id,
+        model: 'local-rules-engine',
+        isOffline: true,
+      };
   }
 
   async *generateStream(request: AIRequest): AsyncIterable<AIStreamChunk> {

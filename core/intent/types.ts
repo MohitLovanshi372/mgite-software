@@ -17,6 +17,13 @@ export type IntentType =
   | 'NOTIFICATION_REQUEST'
   | 'SETTINGS_REQUEST'
   | 'SYSTEM_STATUS_REQUEST'
+  | 'open_youtube'
+  | 'search_youtube'
+  | 'play_music'
+  | 'stop_music'
+  | 'change_video'
+  | 'download_media'
+  | 'avatar_emote'
   | 'UNKNOWN';
 
 export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -35,6 +42,9 @@ export interface IntentEntities {
   time?: string;
   person?: string;
   app?: string;
+  device?: string;
+  action?: string;
+  target?: string;
   location?: string;
   query?: string;
   document?: string;
@@ -52,6 +62,7 @@ export interface IntentResult {
   clarificationQuestion?: string;
   reasoning?: string;
   rawInput: string;
+  query?: string;
 }
 
 export type ProactiveTrigger =

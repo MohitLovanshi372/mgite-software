@@ -30,6 +30,7 @@ import { WebSpeechTTSProvider } from './webSpeechProvider.ts';
 import { MockTextToSpeechProvider } from './mockSpeechProvider.ts';
 import { PrivacyFilter } from '../security/privacyFilter.ts';
 import { LanguageDetector, LanguageDetectionResult } from './languageDetector.ts';
+import { SpeechTextNormalizer, SpeechNormalizationResult } from './speechTextNormalizer.ts';
 import { getConfig } from '../../config/settings.ts';
 import { logger } from '../logger.ts';
 
@@ -43,6 +44,8 @@ export interface TTSDispatchResult {
   blockedByPrivacy: boolean;
   blockReason?: string;
   text: string;
+  originalText?: string;
+  normalizedText?: string;
   textOnly: boolean;
   error?: string;
 }
@@ -153,6 +156,26 @@ export class TTSRouter implements TextToSpeechProvider {
     this.localProvider.setVolume(volume);
   }
 
+  public setStability(stability: number): void {
+    this.elevenLabsProvider.setStability(stability);
+  }
+
+  public setStyle(style: number): void {
+    this.elevenLabsProvider.setStyle(style);
+  }
+
+  public setSimilarityBoost(val: number): void {
+    this.elevenLabsProvider.setSimilarityBoost(val);
+  }
+
+  public setPitch(pitch: number): void {
+    this.elevenLabsProvider.setPitch(pitch);
+  }
+
+  public getElevenLabsSettings() {
+    return this.elevenLabsProvider.getVoiceSettings();
+  }
+
   public stop(): void {
     this.isCurrentlySpeaking = false;
     this.elevenLabsProvider.stop();
@@ -247,11 +270,23 @@ export class TTSRouter implements TextToSpeechProvider {
     }
 
     // =========================================================================
-    // STEP 2: LANGUAGE DETECTION
+    // STEP 2: SPEECH TEXT NORMALIZATION LAYER
+    // AI response -> SpeechTextNormalizer -> Language detection -> TTS -> Audio
+    // Guarantees:
+    // - Preserves normal words as complete words (never spells letter-by-letter)
+    // - Keeps technical terms readable: YouTube, Gemini, CPU, GPU, RAM, API, etc.
+    // - Strips markdown, code blocks, raw JSON/tool output
+    // - Replaces URLs with natural phrase ("Link ready hai.")
+    // =========================================================================
+    const normResult: SpeechNormalizationResult = SpeechTextNormalizer.normalize(text);
+    const speechText = normResult.normalizedText || text;
+
+    // =========================================================================
+    // STEP 3: LANGUAGE DETECTION & PRESERVATION
     // Hindi Devanagari text is preserved ("मुझे आज कॉलेज जाना है।").
     // Hinglish mixed text is preserved ("आज मेरा project complete हो गया।").
     // =========================================================================
-    const langInfo: LanguageDetectionResult = LanguageDetector.detect(text);
+    const langInfo: LanguageDetectionResult = LanguageDetector.detect(speechText);
 
     const speakOptions: SpeakOptions = {
       ...options,
@@ -265,13 +300,13 @@ export class TTSRouter implements TextToSpeechProvider {
     this.isCurrentlySpeaking = true;
 
     // =========================================================================
-    // STEP 3: ROUTING RULES
+    // STEP 4: ROUTING RULES
     // Rule 3: If offline -> Local/System TTS directly
     // =========================================================================
     if (isOffline) {
       logger.info('TTSRouter', 'Offline mode active: Routing directly to Local/System TTS.');
       try {
-        await this.localProvider.speak(text, speakOptions);
+        await this.localProvider.speak(speechText, speakOptions);
         const result: TTSDispatchResult = {
           success: true,
           providerUsed: (this.localProvider.id as any) || 'local',
@@ -280,7 +315,9 @@ export class TTSRouter implements TextToSpeechProvider {
           detectedLanguage: langInfo.language,
           languageCode: langInfo.languageCode,
           blockedByPrivacy: false,
-          text,
+          text: speechText,
+          originalText: text,
+          normalizedText: speechText,
           textOnly: false,
         };
         this.lastDispatchResult = result;
@@ -288,7 +325,7 @@ export class TTSRouter implements TextToSpeechProvider {
         return result;
       } catch (localErr: any) {
         logger.warn('TTSRouter', `Local TTS failed in offline mode: ${localErr.message}`);
-        return this.fallbackToTextOnly(text, langInfo, 'Offline mode with local TTS error');
+        return this.fallbackToTextOnly(speechText, langInfo, 'Offline mode with local TTS error', text);
       }
     }
 
@@ -300,7 +337,7 @@ export class TTSRouter implements TextToSpeechProvider {
 
       if (isElevenLabsAvailable) {
         try {
-          await this.elevenLabsProvider.speak(text, speakOptions);
+          await this.elevenLabsProvider.speak(speechText, speakOptions);
           const result: TTSDispatchResult = {
             success: true,
             providerUsed: 'elevenlabs',
@@ -308,7 +345,9 @@ export class TTSRouter implements TextToSpeechProvider {
             detectedLanguage: langInfo.language,
             languageCode: langInfo.languageCode,
             blockedByPrivacy: false,
-            text,
+            text: speechText,
+            originalText: text,
+            normalizedText: speechText,
             textOnly: false,
           };
           this.lastDispatchResult = result;
@@ -320,7 +359,7 @@ export class TTSRouter implements TextToSpeechProvider {
             'TTSRouter',
             `ElevenLabs TTS failed (${elevenLabsErr.message}). Initiating graceful fallback to Local/System TTS.`
           );
-          return await this.fallbackToLocal(text, speakOptions, langInfo, elevenLabsErr.message);
+          return await this.fallbackToLocal(speechText, speakOptions, langInfo, elevenLabsErr.message, text);
         }
       } else {
         // ElevenLabs missing key or voice -> fallback to local
@@ -328,14 +367,14 @@ export class TTSRouter implements TextToSpeechProvider {
           'TTSRouter',
           'ElevenLabs configured but unavailable (missing API key or voice). Falling back to Local/System TTS.'
         );
-        return await this.fallbackToLocal(text, speakOptions, langInfo, 'elevenlabs_credentials_missing');
+        return await this.fallbackToLocal(speechText, speakOptions, langInfo, 'elevenlabs_credentials_missing', text);
       }
     }
 
     // If configured provider is local/system directly
     if (this.localProvider.isAvailable()) {
       try {
-        await this.localProvider.speak(text, speakOptions);
+        await this.localProvider.speak(speechText, speakOptions);
         const result: TTSDispatchResult = {
           success: true,
           providerUsed: (this.localProvider.id as any) || 'local',
@@ -343,19 +382,21 @@ export class TTSRouter implements TextToSpeechProvider {
           detectedLanguage: langInfo.language,
           languageCode: langInfo.languageCode,
           blockedByPrivacy: false,
-          text,
+          text: speechText,
+          originalText: text,
+          normalizedText: speechText,
           textOnly: false,
         };
         this.lastDispatchResult = result;
         this.isCurrentlySpeaking = false;
         return result;
       } catch (err: any) {
-        return this.fallbackToTextOnly(text, langInfo, err.message);
+        return this.fallbackToTextOnly(speechText, langInfo, err.message, text);
       }
     }
 
     // Rule 4: If no TTS provider is available -> text-only response (never crash)
-    return this.fallbackToTextOnly(text, langInfo, 'no_tts_provider_available');
+    return this.fallbackToTextOnly(speechText, langInfo, 'no_tts_provider_available', text);
   }
 
   /**
@@ -365,7 +406,8 @@ export class TTSRouter implements TextToSpeechProvider {
     text: string,
     options: SpeakOptions,
     langInfo: LanguageDetectionResult,
-    reason: string
+    reason: string,
+    originalText?: string
   ): Promise<TTSDispatchResult> {
     try {
       if (this.localProvider.isAvailable()) {
@@ -379,6 +421,8 @@ export class TTSRouter implements TextToSpeechProvider {
           languageCode: langInfo.languageCode,
           blockedByPrivacy: false,
           text,
+          originalText: originalText || text,
+          normalizedText: text,
           textOnly: false,
         };
         this.lastDispatchResult = result;
@@ -390,7 +434,7 @@ export class TTSRouter implements TextToSpeechProvider {
     }
 
     // Rule 4: Fallback to text-only if local also unavailable
-    return this.fallbackToTextOnly(text, langInfo, `Local fallback failed: ${reason}`);
+    return this.fallbackToTextOnly(text, langInfo, `Local fallback failed: ${reason}`, originalText);
   }
 
   /**
@@ -399,7 +443,8 @@ export class TTSRouter implements TextToSpeechProvider {
   private fallbackToTextOnly(
     text: string,
     langInfo: LanguageDetectionResult,
-    reason: string
+    reason: string,
+    originalText?: string
   ): TTSDispatchResult {
     this.isCurrentlySpeaking = false;
     logger.info('TTSRouter', `Graceful text-only response active: ${reason}`);
@@ -412,6 +457,8 @@ export class TTSRouter implements TextToSpeechProvider {
       languageCode: langInfo.languageCode,
       blockedByPrivacy: false,
       text,
+      originalText: originalText || text,
+      normalizedText: text,
       textOnly: true,
     };
     this.lastDispatchResult = result;

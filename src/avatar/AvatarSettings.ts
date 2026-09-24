@@ -26,7 +26,7 @@ export const DEFAULT_AVATAR_SETTINGS: AvatarSettingsConfig = {
   reducedMotion: false,
 };
 
-const STORAGE_KEY = 'jarvis_avatar_settings_v1';
+const STORAGE_KEY = 'ultron_galaxy_avatar_settings_v1';
 
 export class AvatarSettings {
   private static instance: AvatarSettings | null = null;

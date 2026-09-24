@@ -33,7 +33,7 @@ export const DocumentsPage: React.FC = () => {
           onClick={() => {
             const newDoc = {
               id: `doc-${Date.now()}`,
-              name: `KINEMATIC_ROBOTIC_ARM_SPEC_${Date.now().toString().slice(-4)}.bin`,
+              name: `KEPLERIAN_ORBITAL_EPHEMERIS_${Date.now().toString().slice(-4)}.bin`,
               size: '1.2 MB',
               entropy: '7.98',
               type: 'BINARY' as const,

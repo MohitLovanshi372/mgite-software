@@ -378,7 +378,7 @@ export const CameraGestureHUD: React.FC<CameraGestureHUDProps> = ({
               </div>
 
               <p className="text-[10px] text-zinc-400">
-                Hold your hand in position and click calibrate. The robotic system will record feature vectors (spread, contour solidity, aspect ratio) and train its neural network weights.
+                Hold your hand in position and click calibrate. The optical system will record feature vectors (spread, contour solidity, aspect ratio) and train its neural network weights.
               </p>
 
               <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">

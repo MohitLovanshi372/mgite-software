@@ -1,6 +1,6 @@
 /**
  * Architecture Page
- * Interactive subsystem topology and component map of the autonomous robotic AI OS.
+ * Interactive subsystem topology and component map of the solar observatory AI OS.
  */
 
 import React from 'react';
@@ -13,7 +13,7 @@ export const ArchitecturePage: React.FC = () => {
       code: 'CORE_ORCHESTRATOR',
       title: 'Cognitive Orchestrator',
       status: 'SOVEREIGN',
-      desc: 'Central executive state machine. Orchestrates perception, intention decomposition, safety boundary verification, and motor actuation.',
+      desc: 'Central executive state machine. Orchestrates perception, planetary ephemeris decomposition, safety boundary verification, and observatory controls.',
       badgeColor: 'red' as const,
     },
     {
@@ -24,17 +24,17 @@ export const ArchitecturePage: React.FC = () => {
       badgeColor: 'emerald' as const,
     },
     {
-      code: 'KINEMATIC_RIG',
-      title: 'Robotic 3D Kinematics',
+      code: 'CELESTIAL_RIG',
+      title: 'Celestial 3D Mechanics',
       status: '60 FPS',
-      desc: 'Three.js / React Three Fiber humanoid core. Articulating jaw servos, glowing optical sensors, and rotating HUD energy rings.',
+      desc: 'Three.js / React Three Fiber solar system core. Keplerian elliptical orbits, axial inclinations, and real-time orbital velocity calculations.',
       badgeColor: 'red' as const,
     },
     {
       code: 'ACOUSTIC_SYNAPSE',
       title: 'Neural Speech Synapse',
       status: 'LOW LATENCY',
-      desc: 'Deep robotic voice synthesis and ultra-low latency microphone waveform processing directly on local Web Audio buffers.',
+      desc: 'Deep synthesized voice feedback and ultra-low latency microphone waveform processing directly on local Web Audio buffers.',
       badgeColor: 'amber' as const,
     },
     {

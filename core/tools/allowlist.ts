@@ -17,8 +17,35 @@ export class ToolAllowlist {
   private allowedTools: Map<string, ToolDefinition> = new Map();
 
   constructor() {
-    // In Phase 1, no arbitrary OS tools are allowed.
-    // Tool list is strictly controlled.
+    // Register safe YouTube and music browser tools strictly on allowlisted domain
+    this.registerTool({
+      id: 'open_youtube',
+      name: 'Open YouTube',
+      description: 'Safely opens YouTube in the default browser using allowlisted domain https://www.youtube.com',
+      requiresInternet: true,
+      permissionLevel: 'SAFE_EXECUTE',
+    });
+    this.registerTool({
+      id: 'search_youtube',
+      name: 'Search YouTube',
+      description: 'Safely searches for songs or videos on YouTube using allowlisted domain https://www.youtube.com',
+      requiresInternet: true,
+      permissionLevel: 'SAFE_EXECUTE',
+    });
+    this.registerTool({
+      id: 'play_music',
+      name: 'Play Music',
+      description: 'Safely plays music or opens YouTube music search using allowlisted domain https://www.youtube.com',
+      requiresInternet: true,
+      permissionLevel: 'SAFE_EXECUTE',
+    });
+    this.registerTool({
+      id: 'stop_music',
+      name: 'Stop Music',
+      description: 'Safely pauses or stops music playback and media streams without closing unrelated tabs',
+      requiresInternet: false,
+      permissionLevel: 'SAFE_EXECUTE',
+    });
   }
 
   public registerTool(tool: ToolDefinition): void {

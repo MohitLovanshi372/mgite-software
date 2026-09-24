@@ -1,6 +1,6 @@
 /**
  * AIState Component
- * State selector buttons allowing manual inspection of all robotic AI states.
+ * State selector buttons allowing manual inspection of all observatory AI states.
  */
 
 import React from 'react';

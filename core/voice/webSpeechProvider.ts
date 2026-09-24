@@ -14,6 +14,49 @@ import {
   SpeakOptions,
 } from './types.ts';
 
+/**
+ * Phonetic normalizer for mixed Hindi, Hinglish, and English speech recognition.
+ * Corrects common acoustic mishearings of Indian code-switching commands like
+ * 'light chalao', 'system status dikhao', etc.
+ */
+export function normalizeMixedLanguageTranscript(
+  rawTranscript: string,
+  alternatives: string[] = []
+): string {
+  if (!rawTranscript) return '';
+  let text = rawTranscript.trim();
+
+  // 1. Inspect alternatives if primary lacks clear command pattern
+  const allCandidates = [text, ...alternatives];
+  for (const cand of allCandidates) {
+    if (/(light\s+chalao|light\s+jalao|status\s+dikhao|system\s+status|light\s+band)/i.test(cand)) {
+      text = cand;
+      break;
+    }
+  }
+
+  // 2. Normalize wake words with optional punctuation
+  text = text.replace(/^(hey\s+)?(jarvis|ultron)[\s,:;—-]+/i, 'Jarvis, ');
+
+  // 3. Common English acoustic misrecognitions of Hindi/Hinglish verb stems:
+  // "light shallow" / "light shallot" / "light chalo" -> "light chalao"
+  text = text.replace(/\blight\s+(shallow|shallot|chalo|chalau|salot|calo)\b/gi, 'light chalao');
+
+  // "light burn karo" / "light pan karo" / "light bund karo" -> "light band karo"
+  text = text.replace(/\blight\s+(burn\s+karo|pan\s+karo|bund\s+karo|ban\s+karo|bunk\s+karo)\b/gi, 'light band karo');
+
+  // "system status the cow" / "status the cow" / "status decal" -> "status dikhao"
+  text = text.replace(/\b(system\s+status|status)\s+(the\s+cow|decal|the\s+khao|the\s+call|dekho|dekhau|dekao)\b/gi, '$1 dikhao');
+
+  // "light on kara" / "light on kar do" / "light on karo"
+  text = text.replace(/\blight\s+(on\s+kara|on\s+kar\s+do)\b/gi, 'light on karo');
+
+  // "system status the cow" standalone fallback
+  text = text.replace(/\bthe\s+cow\b/gi, 'dikhao');
+
+  return text;
+}
+
 export class WebSpeechSTTProvider implements SpeechToTextProvider {
   public readonly id = 'web_speech_stt';
   public readonly name = 'Browser Web Speech Recognition';
@@ -59,17 +102,21 @@ export class WebSpeechSTTProvider implements SpeechToTextProvider {
       this.recognition = new SpeechRec();
       this.recognition.continuous = false;
       this.recognition.interimResults = true;
+      this.recognition.maxAlternatives = 3;
 
-      // Language configuration
-      let targetLang = 'en-US';
+      // Language configuration:
+      // Default to 'en-IN' (Indian English) for 'auto', 'hinglish', or empty language
+      // because en-IN acoustic models natively support bilingual Indian code-switching (Hinglish).
+      let targetLang = 'en-IN';
       if (options.language) {
-        if (options.language === 'hi' || options.language === 'hi-IN') {
+        const langLower = options.language.toLowerCase();
+        if (langLower === 'hi' || langLower === 'hi-in' || langLower === 'hindi') {
           targetLang = 'hi-IN';
-        } else if (options.language === 'en-IN') {
-          targetLang = 'en-IN';
-        } else if (options.language === 'en' || options.language === 'en-US') {
+        } else if (langLower === 'en' || langLower === 'en-us' || langLower === 'english') {
           targetLang = 'en-US';
-        } else if (options.language !== 'auto') {
+        } else if (langLower === 'en-in' || langLower === 'hinglish' || langLower === 'auto') {
+          targetLang = 'en-IN';
+        } else {
           targetLang = options.language;
         }
       }
@@ -82,23 +129,32 @@ export class WebSpeechSTTProvider implements SpeechToTextProvider {
       this.recognition.onresult = (event: any) => {
         let interim = '';
         let final = '';
+        const alternatives: string[] = [];
 
         for (let i = event.resultIndex; i < event.results.length; ++i) {
-          const transcript = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
+          const item = event.results[i];
+          const transcript = item[0]?.transcript || '';
+          if (item.isFinal) {
             final += transcript;
+            for (let alt = 1; alt < item.length; alt++) {
+              if (item[alt]?.transcript) {
+                alternatives.push(item[alt].transcript);
+              }
+            }
           } else {
             interim += transcript;
           }
         }
 
         if (interim && options.onInterim) {
-          options.onInterim(interim);
+          // Normalize interim text for real-time display
+          options.onInterim(normalizeMixedLanguageTranscript(interim));
         }
 
         if (final) {
+          const normalized = normalizeMixedLanguageTranscript(final.trim(), alternatives);
           const result: STTResult = {
-            transcript: final.trim(),
+            transcript: normalized,
             confidence: event.results[0]?.[0]?.confidence || 0.9,
             detectedLanguage: targetLang,
             isFinal: true,

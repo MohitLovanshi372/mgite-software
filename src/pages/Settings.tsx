@@ -1,19 +1,35 @@
 /**
  * Settings Page
- * System configuration, operator profile, optical lighting parameters, and storage retention.
+ * System configuration, operator profile, optical lighting parameters,
+ * HUD centerpiece selector (Face vs Reactor Core), and Push-to-Talk chord control.
  */
 
-import React, { useState } from 'react';
-import { Settings, User, Eye, Shield, Check, Sliders } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Settings, User, Eye, Check, Cpu, Mic, Radio } from 'lucide-react';
+import { pushToTalkService } from '../utils/pushToTalkService.ts';
 
 export const SettingsPage: React.FC = () => {
   const [operator, setOperator] = useState('Mohit Lovanshi');
   const [colorProfile, setColorProfile] = useState('CRIMSON_RED');
-  const [rotationSpeed, setRotationSpeed] = useState('DYNAMIC');
+  const [hudCenterpiece, setHudCenterpiece] = useState<'face' | 'reactor'>('face');
+  const [pushToTalk, setPushToTalk] = useState<boolean>(false);
   const [savedToast, setSavedToast] = useState(false);
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    // Load persisted HUD centerpiece mode
+    const savedHud = localStorage.getItem('jarvis_hud_centerpiece_mode');
+    if (savedHud === 'reactor' || savedHud === 'face') {
+      setHudCenterpiece(savedHud);
+    }
+    // Load persisted Push-to-talk
+    setPushToTalk(pushToTalkService.isPushToTalkEnabled());
+  }, []);
+
+  const handleSave = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    localStorage.setItem('jarvis_hud_centerpiece_mode', hudCenterpiece);
+    pushToTalkService.setPushToTalkEnabled(pushToTalk);
+
     setSavedToast(true);
     setTimeout(() => setSavedToast(false), 2400);
   };
@@ -31,7 +47,7 @@ export const SettingsPage: React.FC = () => {
               SYSTEM SETTINGS & PARAMETERS
             </h2>
             <p className="text-xs text-zinc-400">
-              Operator identity • Optical flare tuning • Storage retention policies
+              HUD Centerpiece • Push-to-Talk • Optical Laser Palette • Operator Clearances
             </p>
           </div>
         </div>
@@ -46,7 +62,113 @@ export const SettingsPage: React.FC = () => {
 
       {/* Settings Form */}
       <form onSubmit={handleSave} className="space-y-6 my-6 max-w-3xl">
-        {/* Operator Profile */}
+        {/* 1. HUD Centerpiece Mode (Two HUDs, one toggle) */}
+        <div className="p-4 bg-[#08090f] border border-zinc-800 space-y-3 rounded-xs">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold text-red-400 uppercase tracking-widest flex items-center gap-2">
+              <Cpu className="w-4 h-4" />
+              HUD CENTERPIECE VISUALIZATION (⚙ → HUD)
+            </h3>
+            <span className="text-[10px] text-zinc-500 font-mono">100% SOFTWARE 2D PAINTER</span>
+          </div>
+          <p className="text-[11px] text-zinc-400">
+            Select the central visualization module. Both render via zero-dependency software painter with identical performance and survive restart.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div
+              onClick={() => setHudCenterpiece('face')}
+              className={`p-3.5 border transition-all cursor-pointer rounded-xs flex flex-col justify-between ${
+                hudCenterpiece === 'face'
+                  ? 'bg-red-950/60 border-red-500 text-red-400 shadow-[0_0_12px_rgba(239,68,68,0.3)]'
+                  : 'bg-[#050608] border-zinc-800 text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-bold text-zinc-100 flex items-center gap-1.5">
+                    🧑‍🎤 ANIMATED HUMAN HEAD
+                  </span>
+                  {hudCenterpiece === 'face' && (
+                    <span className="text-[9px] px-1.5 py-0.5 bg-red-600/40 text-red-300 font-mono">ACTIVE</span>
+                  )}
+                </div>
+                <p className="text-[10px] text-zinc-400 leading-relaxed">
+                  MediaPipe canonical face geometry with actual eyelids, lips, and cheekbones. Dual-source lip-sync (50 shapes/sec) from formant physics and transcript articulation rules.
+                </p>
+              </div>
+              <div className="text-[9px] text-red-400/80 mt-2 font-mono">
+                &gt; Features: Saccades, phrase-riding brows, eyelid blink, gaze status light
+              </div>
+            </div>
+
+            <div
+              onClick={() => setHudCenterpiece('reactor')}
+              className={`p-3.5 border transition-all cursor-pointer rounded-xs flex flex-col justify-between ${
+                hudCenterpiece === 'reactor'
+                  ? 'bg-red-950/60 border-red-500 text-red-400 shadow-[0_0_12px_rgba(239,68,68,0.3)]'
+                  : 'bg-[#050608] border-zinc-800 text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-bold text-zinc-100 flex items-center gap-1.5">
+                    ◉ ARC REACTOR CORE
+                  </span>
+                  {hudCenterpiece === 'reactor' && (
+                    <span className="text-[9px] px-1.5 py-0.5 bg-red-600/40 text-red-300 font-mono">ACTIVE</span>
+                  )}
+                </div>
+                <p className="text-[10px] text-zinc-400 leading-relaxed">
+                  Calibrated gauge ring, 3 concentric arcs whose speed matches AI thought state, real-time audio waveform spectrum ring, and a core that brightens with the voice.
+                </p>
+              </div>
+              <div className="text-[9px] text-red-400/80 mt-2 font-mono">
+                &gt; Features: Zero decorative motion; all arcs and spikes are functional telemetry
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 2. Push-to-Talk (⚙ → PUSH-TO-TALK) */}
+        <div className="p-4 bg-[#08090f] border border-zinc-800 space-y-3 rounded-xs">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold text-red-400 uppercase tracking-widest flex items-center gap-2">
+              <Mic className="w-4 h-4" />
+              PUSH-TO-TALK CHORD CONTROL (⚙ → PUSH-TO-TALK)
+            </h3>
+            <button
+              type="button"
+              onClick={() => setPushToTalk(!pushToTalk)}
+              className={`px-3 py-1 text-xs font-bold font-mono transition-colors cursor-pointer border ${
+                pushToTalk
+                  ? 'bg-emerald-950 text-emerald-400 border-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]'
+                  : 'bg-zinc-900 text-zinc-400 border-zinc-700'
+              }`}
+            >
+              {pushToTalk ? 'ENABLED [CTRL+SPACE]' : 'DISABLED [HANDS-FREE]'}
+            </button>
+          </div>
+
+          <p className="text-[11px] text-zinc-300 leading-relaxed">
+            When enabled, the microphone stays closed and nothing leaves the machine until you hold <strong className="text-red-400">Ctrl+Space</strong>. Holding the chord wakes the assistant as a silent alternative to speaking the wake word.
+          </p>
+
+          <div className="p-2.5 bg-[#030406] border border-zinc-800 text-[10px] text-zinc-400 font-mono space-y-1">
+            <div className="flex items-center gap-2 text-zinc-300">
+              <Radio className="w-3.5 h-3.5 text-red-500 animate-pulse" />
+              <span>PLATFORM CHORD STATUS:</span>
+            </div>
+            <p>
+              • <span className="text-zinc-200">Windows:</span> Polling virtual-key codes for global chord capture without message loop overhead.
+            </p>
+            <p>
+              • <span className="text-zinc-200">macOS & Linux:</span> Chord bound cleanly inside the active window.
+            </p>
+          </div>
+        </div>
+
+        {/* 3. Operator Designation */}
         <div className="p-4 bg-[#08090f] border border-zinc-800 space-y-3 rounded-xs">
           <h3 className="text-xs font-bold text-red-400 uppercase tracking-widest flex items-center gap-2">
             <User className="w-4 h-4" />
@@ -75,7 +197,7 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Optical Glow Lighting */}
+        {/* 4. Optical Glow Lighting */}
         <div className="p-4 bg-[#08090f] border border-zinc-800 space-y-3 rounded-xs">
           <h3 className="text-xs font-bold text-red-400 uppercase tracking-widest flex items-center gap-2">
             <Eye className="w-4 h-4" />
@@ -106,9 +228,9 @@ export const SettingsPage: React.FC = () => {
 
         <button
           type="submit"
-          className="px-6 py-2 bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white font-bold text-xs uppercase tracking-widest border border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] cursor-pointer"
+          className="px-6 py-2.5 bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white font-bold text-xs uppercase tracking-widest border border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] cursor-pointer"
         >
-          SAVE CONFIGURATION
+          APPLY CONFIGURATION
         </button>
       </form>
     </div>

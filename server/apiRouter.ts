@@ -15,6 +15,7 @@ import { IntentDetector } from '../core/intent/intentDetector.ts';
 import { ProactivePolicy } from '../core/intent/proactivePolicy.ts';
 import { ProactiveEvent } from '../core/intent/types.ts';
 import { voiceEngine } from '../core/voice/voiceEngine.ts';
+import { SpeechTextNormalizer } from '../core/voice/speechTextNormalizer.ts';
 import { notificationEngine } from '../core/notifications/notificationEngine.ts';
 
 export const apiRouter = express();
@@ -266,6 +267,12 @@ apiRouter.get('/api/voice/status', async (_req: Request, res: Response) => {
     const voices = await voiceEngine.getAvailableVoices();
     const ttsRouter = voiceEngine.getTTSRouter();
     const isElevenLabsConfigured = Boolean(process.env.ELEVENLABS_API_KEY);
+    const elSettings = (ttsRouter as any)?.getElevenLabsSettings?.() || {
+      stability: 0.5,
+      similarity_boost: 0.75,
+      style: 0.65,
+      pitch: 0.72,
+    };
 
     res.json({
       enabled: config.enabled,
@@ -280,6 +287,11 @@ apiRouter.get('/api/voice/status', async (_req: Request, res: Response) => {
       ttsProvider: config.tts_provider || 'elevenlabs',
       elevenlabsModel: config.elevenlabs_model || 'eleven_multilingual_v2',
       elevenlabsConfigured: isElevenLabsConfigured, // Boolean only - ELEVENLABS_API_KEY is NEVER exposed
+      elevenlabsSettings: elSettings,
+      stability: elSettings.stability,
+      style: elSettings.style,
+      similarityBoost: elSettings.similarity_boost,
+      pitch: elSettings.pitch,
       availableVoices: voices,
       activeSessionId: session?.id || null,
       lastDispatchResult: ttsRouter?.getLastDispatchResult() || null,
@@ -298,9 +310,24 @@ apiRouter.post('/api/voice/config', (req: Request, res: Response) => {
       if (req.body.voice_id) ttsRouter.setVoice(req.body.voice_id);
       if (req.body.speech_rate) ttsRouter.setRate(req.body.speech_rate);
       if (req.body.speech_volume) ttsRouter.setVolume(req.body.speech_volume);
+      if (req.body.stability !== undefined && (ttsRouter as any).setStability) {
+        (ttsRouter as any).setStability(Number(req.body.stability));
+      }
+      if (req.body.style !== undefined && (ttsRouter as any).setStyle) {
+        (ttsRouter as any).setStyle(Number(req.body.style));
+      }
+      if (req.body.similarity_boost !== undefined && (ttsRouter as any).setSimilarityBoost) {
+        (ttsRouter as any).setSimilarityBoost(Number(req.body.similarity_boost));
+      }
+      if (req.body.pitch !== undefined && (ttsRouter as any).setPitch) {
+        (ttsRouter as any).setPitch(Number(req.body.pitch));
+      }
     }
-    logger.info('VoiceAPI', 'Voice configuration updated.');
-    res.json(updated);
+    logger.info('VoiceAPI', 'Voice configuration updated with ElevenLabs parameters.');
+    res.json({
+      ...updated,
+      elevenlabsSettings: (ttsRouter as any)?.getElevenLabsSettings?.() || null,
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -308,15 +335,27 @@ apiRouter.post('/api/voice/config', (req: Request, res: Response) => {
 
 apiRouter.post('/api/voice/speak', async (req: Request, res: Response) => {
   try {
-    const { text, voice_id, rate, volume, lang, provider } = req.body;
+    const { text, voice_id, rate, volume, lang, provider, stability, style, similarity_boost, pitch } = req.body;
     if (!text || typeof text !== 'string') {
       res.status(400).json({ error: 'Text is required for TTS synthesis.' });
       return;
     }
 
     const ttsRouter = voiceEngine.getTTSRouter();
-    if (ttsRouter && provider) {
-      ttsRouter.setProvider(provider);
+    if (ttsRouter) {
+      if (provider) ttsRouter.setProvider(provider);
+      if (stability !== undefined && (ttsRouter as any).setStability) {
+        (ttsRouter as any).setStability(Number(stability));
+      }
+      if (style !== undefined && (ttsRouter as any).setStyle) {
+        (ttsRouter as any).setStyle(Number(style));
+      }
+      if (similarity_boost !== undefined && (ttsRouter as any).setSimilarityBoost) {
+        (ttsRouter as any).setSimilarityBoost(Number(similarity_boost));
+      }
+      if (pitch !== undefined && (ttsRouter as any).setPitch) {
+        (ttsRouter as any).setPitch(Number(pitch));
+      }
     }
 
     const result = await voiceEngine.speak(text, {
@@ -324,6 +363,10 @@ apiRouter.post('/api/voice/speak', async (req: Request, res: Response) => {
       rate,
       volume,
       lang,
+      stability: stability !== undefined ? Number(stability) : undefined,
+      style: style !== undefined ? Number(style) : undefined,
+      similarityBoost: similarity_boost !== undefined ? Number(similarity_boost) : undefined,
+      pitch: pitch !== undefined ? Number(pitch) : undefined,
     });
 
     const lastDispatch = ttsRouter?.getLastDispatchResult();
@@ -331,6 +374,7 @@ apiRouter.post('/api/voice/speak', async (req: Request, res: Response) => {
     res.json({
       ...result,
       dispatch: lastDispatch || null,
+      debug: voiceEngine.getNormalizationDebug(),
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -341,6 +385,29 @@ apiRouter.post('/api/voice/stop', (_req: Request, res: Response) => {
   voiceEngine.stopSpeaking();
   voiceEngine.stopListening();
   res.json({ success: true, state: voiceEngine.getState() });
+});
+
+// 10b. Speech Text Normalization Preview & Testing Endpoint
+apiRouter.post(['/api/voice/normalize', '/api/voice/preview'], (req: Request, res: Response) => {
+  try {
+    const { text, userPrompt, userPromptLanguage, targetLanguageMode } = req.body;
+    if (!text || typeof text !== 'string') {
+      res.status(400).json({ error: 'Text field is required for normalization.' });
+      return;
+    }
+    const result = SpeechTextNormalizer.normalize(text, {
+      userPrompt,
+      userPromptLanguage,
+      targetLanguageMode,
+    });
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+apiRouter.get('/api/voice/debug', (_req: Request, res: Response) => {
+  res.json(voiceEngine.getNormalizationDebug());
 });
 
 // ==========================================

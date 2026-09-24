@@ -1,22 +1,21 @@
 /**
- * ULTRON Core Autonomous Robotic AI OS - Type Definitions
+ * ULTRON Galaxy AI OS - Core Type Definitions
  */
 
 export type NavigationPageId =
   | 'command_center'
-  | 'intelligence'
-  | 'memory'
+  | 'chat'
+  | 'voice'
   | 'tasks'
-  | 'calendar'
-  | 'research'
-  | 'documents'
-  | 'applications'
+  | 'memory'
+  | 'tools'
   | 'notifications'
+  | 'settings'
+  | 'glb_studio'
+  | 'galaxy_view'
+  | 'intelligence'
   | 'system_control'
-  | 'network'
-  | 'logs'
-  | 'architecture'
-  | 'settings';
+  | 'youtube_media';
 
 export type AIStateMode =
   | 'IDLE'

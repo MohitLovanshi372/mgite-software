@@ -56,6 +56,10 @@ export class ElevenLabsTTSProvider implements TextToSpeechProvider {
   private speechRate = 1.0;
   private speechVolume = 1.0;
   private streamingEnabled = false;
+  private stability = 0.5;
+  private similarityBoost = 0.75;
+  private style = 0.65;
+  private pitch = 0.72;
 
   // Pluggable client (official ElevenLabsClient instance or mock)
   private client: ElevenLabsClient | any | null = null;
@@ -119,6 +123,49 @@ export class ElevenLabsTTSProvider implements TextToSpeechProvider {
 
   public setVolume(volume: number): void {
     this.speechVolume = Math.max(0.0, Math.min(1.0, volume));
+  }
+
+  public getStability(): number {
+    return this.stability;
+  }
+
+  public setStability(val: number): void {
+    this.stability = Math.max(0.0, Math.min(1.0, val));
+  }
+
+  public getStyle(): number {
+    return this.style;
+  }
+
+  public setStyle(val: number): void {
+    this.style = Math.max(0.0, Math.min(1.0, val));
+  }
+
+  public getSimilarityBoost(): number {
+    return this.similarityBoost;
+  }
+
+  public setSimilarityBoost(val: number): void {
+    this.similarityBoost = Math.max(0.0, Math.min(1.0, val));
+  }
+
+  public getPitch(): number {
+    return this.pitch;
+  }
+
+  public setPitch(val: number): void {
+    this.pitch = Math.max(0.4, Math.min(1.5, val));
+  }
+
+  public getVoiceSettings() {
+    return {
+      stability: this.stability,
+      similarity_boost: this.similarityBoost,
+      style: this.style,
+      pitch: this.pitch,
+      speed: this.speechRate,
+      use_speaker_boost: true,
+    };
   }
 
   /**
@@ -224,8 +271,10 @@ export class ElevenLabsTTSProvider implements TextToSpeechProvider {
     const languageCode = (langInfo.isPureHindi || langInfo.isHinglish) ? 'hi' : (options?.lang === 'hi-IN' ? 'hi' : undefined);
 
     const voiceSettings = {
-      stability: 0.5,
-      similarity_boost: 0.75,
+      stability: options?.stability !== undefined ? options.stability : this.stability,
+      similarity_boost: options?.similarityBoost !== undefined ? options.similarityBoost : this.similarityBoost,
+      style: options?.style !== undefined ? options.style : this.style,
+      use_speaker_boost: true,
       speed: options?.rate ?? this.speechRate,
     };
 

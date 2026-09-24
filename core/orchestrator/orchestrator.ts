@@ -27,6 +27,7 @@ import { IntentDetector } from '../intent/intentDetector.ts';
 import { IntentResult } from '../intent/types.ts';
 import { AvatarInstruction, AvatarEmotion, AvatarGesture, AvatarStateName } from '../ai/types.ts';
 import { AvatarInstructionValidator } from '../avatar/avatarInstruction.ts';
+import { safeBrowserControl } from '../tools/browserControl.ts';
 
 export interface OrchestratorInput {
   message: string;
@@ -216,6 +217,40 @@ export class AssistantOrchestrator {
         intent: intentResult,
         warnings: ['High-risk action requires confirmation before execution.'],
         timestamp: new Date().toISOString(),
+      };
+    }
+
+    // Step 2.7: Safe Browser Tool Execution (YouTube & Music Control)
+    if (
+      intentResult.intent === 'open_youtube' ||
+      intentResult.intent === 'search_youtube' ||
+      intentResult.intent === 'play_music' ||
+      intentResult.intent === 'stop_music'
+    ) {
+      const query = intentResult.query || intentResult.entities?.query;
+      const toolExec = await safeBrowserControl.executeTool(intentResult.intent, { query });
+
+      const responseText = toolExec.message || 'Action executed successfully.';
+      memoryEngine.addMessage(convId, 'user', privacyResult.cleanText);
+      memoryEngine.addMessage(convId, 'assistant', responseText);
+
+      const avatarInstruction = AvatarInstructionValidator.generateFromResponse(
+        responseText,
+        intentResult.intent
+      );
+
+      return {
+        conversationId: convId,
+        response: responseText,
+        provider: 'safe-browser-tools',
+        model: 'allowlisted-browser-control',
+        isOffline: true,
+        intent: intentResult,
+        timestamp: new Date().toISOString(),
+        avatar: avatarInstruction,
+        emotion: avatarInstruction.emotion,
+        gesture: avatarInstruction.gesture,
+        state: avatarInstruction.state,
       };
     }
 
