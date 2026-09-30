@@ -44,6 +44,8 @@ export interface AppConfig {
     stt_provider: string;
     tts_provider: string;
     elevenlabs_model?: string;
+    fish_model?: string;
+    fish_voice_id?: string;
   };
   notification: {
     enabled: boolean;
@@ -98,8 +100,10 @@ let activeConfig: AppConfig = {
     speech_volume: (defaultConfig as any).voice?.speech_volume ?? 1.0,
     interrupt_speech: (defaultConfig as any).voice?.interrupt_speech ?? true,
     stt_provider: (defaultConfig as any).voice?.stt_provider || 'system',
-    tts_provider: process.env.TTS_PROVIDER || (defaultConfig as any).voice?.tts_provider || 'elevenlabs',
+    tts_provider: process.env.TTS_PROVIDER || (defaultConfig as any).voice?.tts_provider || 'fish_audio',
     elevenlabs_model: process.env.ELEVENLABS_MODEL || (defaultConfig as any).voice?.elevenlabs_model || 'eleven_multilingual_v2',
+    fish_model: process.env.FISH_MODEL || (defaultConfig as any).voice?.fish_model || 's2.1-pro-free',
+    fish_voice_id: process.env.FISH_VOICE_ID || (defaultConfig as any).voice?.fish_voice_id || '',
   },
   notification: {
     enabled: process.env.NOTIFICATION_INTELLIGENCE_ENABLED !== undefined

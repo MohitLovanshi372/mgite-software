@@ -17,6 +17,7 @@ import { ProactiveEvent } from '../core/intent/types.ts';
 import { voiceEngine } from '../core/voice/voiceEngine.ts';
 import { SpeechTextNormalizer } from '../core/voice/speechTextNormalizer.ts';
 import { notificationEngine } from '../core/notifications/notificationEngine.ts';
+import { pythonVoiceBridge } from './pythonVoiceBridge.ts';
 
 export const apiRouter = express();
 
@@ -266,7 +267,8 @@ apiRouter.get('/api/voice/status', async (_req: Request, res: Response) => {
     const session = voiceEngine.getCurrentSession();
     const voices = await voiceEngine.getAvailableVoices();
     const ttsRouter = voiceEngine.getTTSRouter();
-    const isElevenLabsConfigured = Boolean(process.env.ELEVENLABS_API_KEY);
+    const isFishAudioConfigured = Boolean(process.env.FISH_API_KEY && process.env.FISH_API_KEY.trim());
+    const isElevenLabsConfigured = Boolean(process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_API_KEY.trim());
     const elSettings = (ttsRouter as any)?.getElevenLabsSettings?.() || {
       stability: 0.5,
       similarity_boost: 0.75,
@@ -284,7 +286,10 @@ apiRouter.get('/api/voice/status', async (_req: Request, res: Response) => {
       speechRate: config.speech_rate,
       speechVolume: config.speech_volume,
       interruptSpeech: config.interrupt_speech,
-      ttsProvider: config.tts_provider || 'elevenlabs',
+      ttsProvider: config.tts_provider || 'fish_audio',
+      fishAudioConfigured: isFishAudioConfigured, // Boolean only - FISH_API_KEY is NEVER exposed
+      fishModel: config.fish_model || 's2.1-pro-free',
+      fishVoiceId: config.fish_voice_id || '',
       elevenlabsModel: config.elevenlabs_model || 'eleven_multilingual_v2',
       elevenlabsConfigured: isElevenLabsConfigured, // Boolean only - ELEVENLABS_API_KEY is NEVER exposed
       elevenlabsSettings: elSettings,
@@ -445,6 +450,73 @@ apiRouter.post('/api/notifications/config', (req: Request, res: Response) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// ==========================================
+// Python Voice Microservice Endpoints
+// ==========================================
+
+apiRouter.get('/api/voice/microservice/status', (_req: Request, res: Response) => {
+  res.json({
+    status: 'online',
+    isReady: pythonVoiceBridge.isServiceReady(),
+    service: 'python_voice_microservice',
+    engine: 'AcousticCyberneticSynthesizer',
+    sampleRate: 24000,
+    features: [
+      'multilingual_phonetic_normalization',
+      'feminine_grammar_calibration',
+      'devanagari_romanization',
+      'acronym_prosody_expansion',
+      'currency_numbers_units_formatting',
+      'formant_vowel_synthesis',
+      'consonant_fricatives_and_plosives',
+      'sub_bass_55hz_resonance',
+      'realtime_chunked_streaming',
+      'websocket_ipc_pipeline',
+    ],
+  });
+});
+
+apiRouter.post('/api/voice/microservice/process', async (req: Request, res: Response) => {
+  try {
+    const { text, options } = req.body;
+    if (!text || typeof text !== 'string') {
+      res.status(400).json({ error: 'Text field is required' });
+      return;
+    }
+    const result = await pythonVoiceBridge.processText(text, options);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+apiRouter.post('/api/voice/microservice/synthesize', async (req: Request, res: Response) => {
+  try {
+    const { text, options } = req.body;
+    if (!text || typeof text !== 'string') {
+      res.status(400).json({ error: 'Text field is required' });
+      return;
+    }
+    const chunks: Buffer[] = [];
+    await pythonVoiceBridge.synthesizeStream(text, options, (evt) => {
+      if (evt.event === 'chunk' && evt.audio_base64) {
+        chunks.push(Buffer.from(evt.audio_base64, 'base64'));
+      }
+    });
+
+    if (chunks.length > 0) {
+      const combined = Buffer.concat(chunks);
+      res.setHeader('Content-Type', 'audio/wav');
+      res.send(combined);
+    } else {
+      res.status(500).json({ error: 'No audio generated' });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 
 

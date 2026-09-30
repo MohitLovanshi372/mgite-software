@@ -30,6 +30,8 @@ interface CommandCenterProps {
   onGestureTrigger?: (gesture: LearnedGesture) => void;
   controlledEmote?: AvatarEmotion | null;
   onEmoteChange?: (emote: AvatarEmotion) => void;
+  isAutoSpeechActive?: boolean;
+  onToggleAutoSpeech?: () => void;
 }
 
 export const CommandCenter: React.FC<CommandCenterProps> = ({
@@ -40,6 +42,8 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
   onGestureTrigger,
   controlledEmote,
   onEmoteChange,
+  isAutoSpeechActive = false,
+  onToggleAutoSpeech,
 }) => {
   const [viewportMode, setViewportMode] = useState<StageViewportMode>('jarvis_avatar');
   const [showOpticalHUD, setShowOpticalHUD] = useState<boolean>(false);
@@ -146,6 +150,8 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
             controlledEmote={controlledEmote}
             onEmoteChange={onEmoteChange}
             isMusicPlaying={isMediaPlaying}
+            isAutoSpeechActive={isAutoSpeechActive}
+            onToggleAutoSpeech={onToggleAutoSpeech}
           />
         )}
 

@@ -51,6 +51,26 @@ const ACRONYM_MAP: Record<string, string> = {
   '3D': 'Three-D',
   '2D': 'Two-D',
   RAM: 'Ram',
+  CPU: 'C P U',
+  GPU: 'G P U',
+  API: 'A P I',
+  URL: 'U R L',
+  TTS: 'T T S',
+  STT: 'S T T',
+  HUD: 'H U D',
+  AI: 'A I',
+  UI: 'U I',
+  UX: 'U X',
+  OS: 'O S',
+  ID: 'I D',
+  IP: 'I P',
+  SQL: 'Sequel',
+  GB: 'G B',
+  MB: 'M B',
+  TB: 'T B',
+  KB: 'K B',
+  GHz: 'Giga hertz',
+  MHz: 'Mega hertz',
 };
 
 // Hindi Devanagari technical word phonetics (assists browser Hindi voices to speak English loanwords cleanly)
@@ -66,6 +86,11 @@ const DEVANAGARI_LOANWORD_MAP: Record<string, string> = {
   '3d': 'थ्री डी',
   'AI': 'ए आई',
   'GLB': 'जी एल बी',
+  'सीपीयू': 'सी पी यू',
+  'जीपीयू': 'जी पी यू',
+  'रैम': 'रैम',
+  'एपीआई': 'ए पी आई',
+  'वाईफाई': 'वाई फाई',
 };
 
 // Hinglish Romanized phonetic adjustments for Indian English & Hindi speech synthesizers
@@ -88,6 +113,13 @@ const HINGLISH_PHONETIC_REPLACEMENTS: [RegExp, string][] = [
   [/\bkijiye\b/gi, 'keejiye'],
   [/\bdijiye\b/gi, 'deejiye'],
   [/\blijiye\b/gi, 'leejiye'],
+  [/\bbilkul\b/gi, 'bilkul'],
+  [/\bbadhiya\b/gi, 'badiya'],
+  [/\bshuru\b/gi, 'shuroo'],
+  [/\bsamajh\s+gayi\b/gi, 'samajh gayee'],
+  [/\bkarti\s+hoon\b/gi, 'karti hoon'],
+  [/\bkar\s+deti\s+hoon\b/gi, 'kar deti hoon'],
+  [/\bkar\s+dungi\b/gi, 'kar doongee'],
 ];
 
 export class PronunciationEngine {

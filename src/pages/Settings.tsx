@@ -5,14 +5,25 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Settings, User, Eye, Check, Cpu, Mic, Radio } from 'lucide-react';
+import { Settings, User, Eye, Check, Cpu, Mic, Radio, Volume2, ShieldCheck, Wifi, WifiOff } from 'lucide-react';
 import { pushToTalkService } from '../utils/pushToTalkService.ts';
+
+interface VoiceStatusInfo {
+  ttsProvider: string;
+  fishAudioConfigured: boolean;
+  fishModel: string;
+  fishVoiceId?: string;
+  elevenlabsConfigured: boolean;
+  elevenlabsModel?: string;
+}
 
 export const SettingsPage: React.FC = () => {
   const [operator, setOperator] = useState('Mohit Lovanshi');
   const [colorProfile, setColorProfile] = useState('CRIMSON_RED');
   const [hudCenterpiece, setHudCenterpiece] = useState<'face' | 'reactor'>('face');
   const [pushToTalk, setPushToTalk] = useState<boolean>(false);
+  const [ttsProvider, setTtsProvider] = useState<'fish_audio' | 'elevenlabs' | 'system'>('fish_audio');
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatusInfo | null>(null);
   const [savedToast, setSavedToast] = useState(false);
 
   useEffect(() => {
@@ -23,12 +34,47 @@ export const SettingsPage: React.FC = () => {
     }
     // Load persisted Push-to-talk
     setPushToTalk(pushToTalkService.isPushToTalkEnabled());
+
+    // Fetch Voice Status from backend
+    fetch('/api/voice/status')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) {
+          setVoiceStatus({
+            ttsProvider: data.ttsProvider || 'fish_audio',
+            fishAudioConfigured: Boolean(data.fishAudioConfigured),
+            fishModel: data.fishModel || 's2.1-pro-free',
+            fishVoiceId: data.fishVoiceId || '',
+            elevenlabsConfigured: Boolean(data.elevenlabsConfigured),
+            elevenlabsModel: data.elevenlabsModel || 'eleven_multilingual_v2',
+          });
+          if (data.ttsProvider) {
+            setTtsProvider(data.ttsProvider as any);
+          }
+        }
+      })
+      .catch(() => {
+        // Safe offline default
+        setVoiceStatus({
+          ttsProvider: 'fish_audio',
+          fishAudioConfigured: false,
+          fishModel: 's2.1-pro-free',
+          elevenlabsConfigured: false,
+        });
+      });
   }, []);
 
   const handleSave = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     localStorage.setItem('jarvis_hud_centerpiece_mode', hudCenterpiece);
     pushToTalkService.setPushToTalkEnabled(pushToTalk);
+
+    // Update backend voice configuration
+    fetch('/api/voice/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tts_provider: ttsProvider }),
+    }).catch(() => {});
 
     setSavedToast(true);
     setTimeout(() => setSavedToast(false), 2400);
@@ -168,7 +214,155 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* 3. Operator Designation */}
+        {/* 3. TTS Provider & Fish Audio Status */}
+        <div className="p-4 bg-[#08090f] border border-zinc-800 space-y-4 rounded-xs">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold text-red-400 uppercase tracking-widest flex items-center gap-2">
+              <Volume2 className="w-4 h-4" />
+              VOICE & TEXT-TO-SPEECH PROVIDER
+            </h3>
+            <span className="text-[10px] text-zinc-500 font-mono">BACKEND SECURE</span>
+          </div>
+
+          <p className="text-[11px] text-zinc-300 leading-relaxed">
+            Select the primary speech synthesizer. All API keys are kept strictly on the backend and never exposed to the client.
+          </p>
+
+          {/* Provider Selector Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Fish Audio */}
+            <div
+              onClick={() => setTtsProvider('fish_audio')}
+              className={`p-3.5 border transition-all cursor-pointer rounded-xs flex flex-col justify-between ${
+                ttsProvider === 'fish_audio'
+                  ? 'bg-red-950/60 border-red-500 text-red-400 shadow-[0_0_12px_rgba(239,68,68,0.3)]'
+                  : 'bg-[#050608] border-zinc-800 text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-bold text-zinc-100 flex items-center gap-1.5">
+                    🐟 FISH AUDIO
+                  </span>
+                  {ttsProvider === 'fish_audio' && (
+                    <span className="text-[9px] px-1.5 py-0.5 bg-red-600/40 text-red-300 font-mono">SELECTED</span>
+                  )}
+                </div>
+                <p className="text-[10px] text-zinc-400 leading-relaxed">
+                  Official Fish Audio API (model: <code className="text-zinc-300">{voiceStatus?.fishModel || 's2.1-pro-free'}</code>). Natural multilingual Hindi &amp; Hinglish cadence.
+                </p>
+              </div>
+
+              {/* Status Badge */}
+              <div className="mt-3 pt-2 border-t border-zinc-800/80 flex items-center justify-between">
+                <span className="text-[10px] text-zinc-400 font-mono">Status:</span>
+                {voiceStatus?.fishAudioConfigured ? (
+                  <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-mono font-bold">
+                    <Wifi className="w-3 h-3 text-emerald-400" />
+                    Connected
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-[10px] text-amber-400 font-mono font-bold">
+                    <WifiOff className="w-3 h-3 text-amber-400" />
+                    Not Connected
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* ElevenLabs */}
+            <div
+              onClick={() => setTtsProvider('elevenlabs')}
+              className={`p-3.5 border transition-all cursor-pointer rounded-xs flex flex-col justify-between ${
+                ttsProvider === 'elevenlabs'
+                  ? 'bg-red-950/60 border-red-500 text-red-400 shadow-[0_0_12px_rgba(239,68,68,0.3)]'
+                  : 'bg-[#050608] border-zinc-800 text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-bold text-zinc-100 flex items-center gap-1.5">
+                    ✨ ELEVENLABS
+                  </span>
+                  {ttsProvider === 'elevenlabs' && (
+                    <span className="text-[9px] px-1.5 py-0.5 bg-red-600/40 text-red-300 font-mono">SELECTED</span>
+                  )}
+                </div>
+                <p className="text-[10px] text-zinc-400 leading-relaxed">
+                  ElevenLabs Multilingual V2 provider. High stability &amp; speech styling.
+                </p>
+              </div>
+
+              {/* Status Badge */}
+              <div className="mt-3 pt-2 border-t border-zinc-800/80 flex items-center justify-between">
+                <span className="text-[10px] text-zinc-400 font-mono">Status:</span>
+                {voiceStatus?.elevenlabsConfigured ? (
+                  <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-mono font-bold">
+                    <Wifi className="w-3 h-3 text-emerald-400" />
+                    Connected
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-[10px] text-zinc-500 font-mono">
+                    <WifiOff className="w-3 h-3 text-zinc-500" />
+                    Not Connected
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* System / Local */}
+            <div
+              onClick={() => setTtsProvider('system')}
+              className={`p-3.5 border transition-all cursor-pointer rounded-xs flex flex-col justify-between ${
+                ttsProvider === 'system'
+                  ? 'bg-red-950/60 border-red-500 text-red-400 shadow-[0_0_12px_rgba(239,68,68,0.3)]'
+                  : 'bg-[#050608] border-zinc-800 text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-bold text-zinc-100 flex items-center gap-1.5">
+                    🔊 LOCAL / BROWSER
+                  </span>
+                  {ttsProvider === 'system' && (
+                    <span className="text-[9px] px-1.5 py-0.5 bg-red-600/40 text-red-300 font-mono">SELECTED</span>
+                  )}
+                </div>
+                <p className="text-[10px] text-zinc-400 leading-relaxed">
+                  Web Speech API native synthesis. Offline-ready and zero external network latency.
+                </p>
+              </div>
+
+              {/* Status Badge */}
+              <div className="mt-3 pt-2 border-t border-zinc-800/80 flex items-center justify-between">
+                <span className="text-[10px] text-zinc-400 font-mono">Status:</span>
+                <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-mono font-bold">
+                  <Check className="w-3 h-3 text-emerald-400" />
+                  Available
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Pipeline & Fallback Architecture Callout */}
+          <div className="p-3 bg-[#030406] border border-zinc-800 text-[10px] text-zinc-400 font-mono space-y-1.5">
+            <div className="flex items-center gap-2 text-zinc-200">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="font-bold">TTS PIPELINE &amp; FALLBACK ARCHITECTURE:</span>
+            </div>
+            <p className="text-zinc-300">
+              Assistant response → <span className="text-cyan-400">SpeechTextNormalizer</span> → <span className="text-red-400 font-bold">FishAudioTTSProvider</span> → Audio → Speaker
+            </p>
+            <p className="text-zinc-400">
+              • <span className="text-zinc-300">Failover:</span> If Fish Audio fails → try existing ElevenLabs provider → if both fail, display text without audio.
+            </p>
+            <p className="text-zinc-400">
+              • <span className="text-zinc-300">Feminine Voice Persona:</span> Preserves Hindi/Hinglish natural feminine grammar (<em>"karti hoon"</em>, <em>"kar deti hoon"</em>, <em>"kar dungi"</em>, <em>"samajh gayi"</em>).
+            </p>
+          </div>
+        </div>
+
+        {/* 4. Operator Designation */}
         <div className="p-4 bg-[#08090f] border border-zinc-800 space-y-3 rounded-xs">
           <h3 className="text-xs font-bold text-red-400 uppercase tracking-widest flex items-center gap-2">
             <User className="w-4 h-4" />

@@ -50,14 +50,26 @@ interface VoiceProfile {
 
 const VOICE_PROFILES: VoiceProfile[] = [
   {
+    id: 'JARVIS_CLEAR',
+    name: 'JARVIS CLEAR (स्पष्ट आवाज़)',
+    tagline: 'High-Clarity Natural Female Voice',
+    pitch: 1.0,
+    stability: 0.85,
+    style: 0.15,
+    similarityBoost: 0.90,
+    rate: 0.98,
+    description: 'Pristine, crystal-clear female voice with zero background drone, natural pitch, and pure Hindi/Hinglish articulation.',
+    langMode: 'AUTO',
+  },
+  {
     id: 'HINDI_NEURAL',
     name: 'HINDI NEURAL (हिन्दी)',
     tagline: 'Articulate Devanagari Cadence',
-    pitch: 0.95,
-    stability: 0.70,
-    style: 0.40,
+    pitch: 1.0,
+    stability: 0.80,
+    style: 0.20,
     similarityBoost: 0.85,
-    rate: 0.94,
+    rate: 0.96,
     description: 'Crisp Devanagari vowel and consonant articulation with natural sentence cadence and danda pauses.',
     langMode: 'HINDI',
   },
@@ -65,11 +77,11 @@ const VOICE_PROFILES: VoiceProfile[] = [
     id: 'HINGLISH_HYBRID',
     name: 'HINGLISH SYNAPSE',
     tagline: 'Bilingual Hindi + English',
-    pitch: 0.90,
-    stability: 0.65,
-    style: 0.50,
-    similarityBoost: 0.80,
-    rate: 0.92,
+    pitch: 1.0,
+    stability: 0.80,
+    style: 0.25,
+    similarityBoost: 0.85,
+    rate: 0.96,
     description: 'Smooth bilingual code-switching between Hindi vocabulary and English terminology with authentic Indian inflection.',
     langMode: 'HINGLISH',
   },
@@ -122,7 +134,7 @@ const AUDITION_PRESETS: AuditionQuote[] = [
   {
     category: 'HINDI',
     label: '🇮🇳 Hindi: Assistant Greeting',
-    text: 'नमस्ते! मैं आपका पर्सनल एआई असिस्टेंट हूँ। आज मैं आपकी क्या सहायता कर सकता हूँ?',
+    text: 'नमस्ते! मैं आपकी पर्सनल एआई असिस्टेंट हूँ। आज मैं आपकी क्या सहायता कर सकती हूँ?',
   },
   {
     category: 'HINDI',
@@ -174,15 +186,16 @@ const AUDITION_PRESETS: AuditionQuote[] = [
 ];
 
 export const UltronVoiceSettingsCard: React.FC = () => {
-  // Voice Synthesis Parameters
-  const [pitch, setPitch] = useState<number>(0.72);
-  const [stability, setStability] = useState<number>(0.50);
-  const [style, setStyle] = useState<number>(0.65);
-  const [similarityBoost, setSimilarityBoost] = useState<number>(0.75);
-  const [rate, setRate] = useState<number>(0.92);
+  // Voice Synthesis Parameters (Default: High-Clarity Clear Voice)
+  const [pitch, setPitch] = useState<number>(1.0);
+  const [stability, setStability] = useState<number>(0.85);
+  const [style, setStyle] = useState<number>(0.15);
+  const [similarityBoost, setSimilarityBoost] = useState<number>(0.90);
+  const [rate, setRate] = useState<number>(0.98);
   const [volume, setVolume] = useState<number>(0.90);
   const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [activeProfile, setActiveProfile] = useState<string>('ULTRON_PRIME');
+  const [activeProfile, setActiveProfile] = useState<string>('JARVIS_CLEAR');
+  const [clearVoiceMode, setClearVoiceMode] = useState<boolean>(true);
 
   // Multilingual & Pronunciation State
   const [languageMode, setLanguageMode] = useState<LanguageMode>('AUTO');
@@ -280,26 +293,26 @@ export const UltronVoiceSettingsCard: React.FC = () => {
     setLanguageMode(mode);
     ultronVoice.setLanguageMode(mode);
 
-    // If Hindi selected, adjust pitch and rate for crisp articulation
+    // Natural clear pitch and cadence across modes
     if (mode === 'HINDI') {
-      setPitch(0.95);
-      setRate(0.94);
-      ultronVoice.setPitch(0.95);
-      ultronVoice.setRate(0.94);
+      setPitch(1.0);
+      setRate(0.96);
+      ultronVoice.setPitch(1.0);
+      ultronVoice.setRate(0.96);
       setCustomQuote(AUDITION_PRESETS[0].text);
       setSelectedPresetIdx(0);
     } else if (mode === 'HINGLISH') {
-      setPitch(0.90);
-      setRate(0.92);
-      ultronVoice.setPitch(0.90);
-      ultronVoice.setRate(0.92);
+      setPitch(1.0);
+      setRate(0.96);
+      ultronVoice.setPitch(1.0);
+      ultronVoice.setRate(0.96);
       setCustomQuote(AUDITION_PRESETS[3].text);
       setSelectedPresetIdx(3);
     } else if (mode === 'ENGLISH') {
-      setPitch(0.72);
-      setRate(0.92);
-      ultronVoice.setPitch(0.72);
-      ultronVoice.setRate(0.92);
+      setPitch(1.0);
+      setRate(0.98);
+      ultronVoice.setPitch(1.0);
+      ultronVoice.setRate(0.98);
       setCustomQuote(AUDITION_PRESETS[6].text);
       setSelectedPresetIdx(6);
     }
@@ -316,6 +329,10 @@ export const UltronVoiceSettingsCard: React.FC = () => {
     setStyle(profile.style);
     setSimilarityBoost(profile.similarityBoost);
     setRate(profile.rate);
+
+    const isClear = profile.id !== 'ULTRON_PRIME' && profile.id !== 'ULTRON_VIBRANIUM';
+    setClearVoiceMode(isClear);
+    ultronVoice.setClearVoiceMode(isClear);
 
     ultronVoice.setPitch(profile.pitch);
     ultronVoice.setStability(profile.stability);

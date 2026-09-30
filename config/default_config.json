@@ -35,8 +35,10 @@
     "speech_volume": 1.0,
     "interrupt_speech": true,
     "stt_provider": "system",
-    "tts_provider": "elevenlabs",
-    "elevenlabs_model": "eleven_multilingual_v2"
+    "tts_provider": "fish_audio",
+    "elevenlabs_model": "eleven_multilingual_v2",
+    "fish_model": "s2.1-pro-free",
+    "fish_voice_id": ""
   },
   "notification": {
     "enabled": true,

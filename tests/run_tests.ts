@@ -27,6 +27,8 @@ import { runYouTubeMusicControlTests } from './phase5_youtube_music_control.test
 import { runNaturalSpeechTests } from './phase3_natural_speech.test.ts';
 import { runFeminineVoicePersonaGrammarTests } from './validate_female_hindi_grammar.test.ts';
 import { runAvatarEmotesAndYouTubeTests } from './avatar_emotes_youtube_download.test.ts';
+import { runFishAudioVoiceTests } from './fish_audio_tts.test.ts';
+import { runVoiceMicroserviceTests } from './voice_microservice_websocket.test.ts';
 
 async function main() {
   console.log('========================================');
@@ -71,8 +73,12 @@ async function main() {
     await runFeminineVoicePersonaGrammarTests();
     console.log('');
     await runAvatarEmotesAndYouTubeTests();
+    console.log('');
+    await runFishAudioVoiceTests();
+    console.log('');
+    await runVoiceMicroserviceTests();
     console.log('\n========================================');
-    console.log('ALL AUTOMATED TESTS (PHASES 1-5 + FEMININE PERSONA + AVATAR & YOUTUBE) PASSED (100%)');
+    console.log('ALL AUTOMATED TESTS (PHASES 1-5 + FEMININE PERSONA + FISH AUDIO TTS) PASSED (100%)');
     console.log('========================================');
   } catch (error) {
     console.error('\n❌ Test execution failed:', error);

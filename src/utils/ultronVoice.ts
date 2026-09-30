@@ -60,6 +60,7 @@ class UltronVoiceEngine {
   private style: number = 0.50;     // Style exaggeration (0.0 - 1.0)
   private similarityBoost: number = 0.80; // Similarity boost (0.0 - 1.0)
   private activeProfile: string = 'JARVIS_FEMALE';
+  private clearVoiceMode: boolean = true; // High-clarity mode: eliminates sub-bass drone and clicks
 
   // Multilingual & Pronunciation Configuration
   private languageMode: LanguageMode = 'AUTO';
@@ -75,6 +76,26 @@ class UltronVoiceEngine {
   private indianEnglishVoices: SpeechSynthesisVoice[] = [];
   private englishVoices: SpeechSynthesisVoice[] = [];
 
+  // WebSocket Voice Microservice Streaming
+  private ws: WebSocket | null = null;
+  private isWsConnected: boolean = false;
+  private reconnectTimeout: any = null;
+  private heartbeatInterval: any = null;
+  private reconnectAttempts: number = 0;
+  private currentStreamRequestId: string | null = null;
+  private streamCallbacks = new Map<string, {
+    options?: VoiceSpeakOptions;
+    resolve: (ok: boolean) => void;
+    reject: (err: any) => void;
+  }>();
+  private pendingTextRequests = new Map<string, {
+    resolve: (data: any) => void;
+    reject: (err: any) => void;
+  }>();
+  private activeAudioSources: AudioBufferSourceNode[] = [];
+  private nextChunkScheduledTime: number = 0;
+  private chunkDecodeQueue: Promise<void> = Promise.resolve();
+
   constructor() {
     if (typeof window !== 'undefined') {
       if ('speechSynthesis' in window) {
@@ -84,7 +105,193 @@ class UltronVoiceEngine {
           this.synth.onvoiceschanged = () => this.refreshVoiceList();
         }
       }
+      this.connectWebSocket();
     }
+  }
+
+  /**
+   * Connects to the backend WebSocket stream for Python Voice Microservice audio
+   */
+  private connectWebSocket() {
+    if (typeof window === 'undefined') return;
+    try {
+      const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.host;
+      if (!host) return;
+      const wsUrl = `${proto}//${host}/ws/voice`;
+
+      this.ws = new WebSocket(wsUrl);
+
+      this.ws.onopen = () => {
+        this.isWsConnected = true;
+        this.reconnectAttempts = 0;
+        this.startHeartbeat();
+      };
+
+      this.ws.onmessage = (event) => {
+        this.handleWebSocketMessage(event.data);
+      };
+
+      this.ws.onclose = () => {
+        this.isWsConnected = false;
+        this.stopHeartbeat();
+        this.scheduleReconnect();
+      };
+
+      this.ws.onerror = () => {
+        this.isWsConnected = false;
+      };
+    } catch (_) {
+      this.isWsConnected = false;
+      this.scheduleReconnect();
+    }
+  }
+
+  private startHeartbeat() {
+    this.stopHeartbeat();
+    this.heartbeatInterval = setInterval(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, 20000);
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  private scheduleReconnect() {
+    if (this.reconnectTimeout) return;
+    const delay = Math.min(1000 * Math.pow(1.5, this.reconnectAttempts), 10000);
+    this.reconnectAttempts++;
+    this.reconnectTimeout = setTimeout(() => {
+      this.reconnectTimeout = null;
+      this.connectWebSocket();
+    }, delay);
+  }
+
+  private base64ToArrayBuffer(base64: string): ArrayBuffer {
+    const binaryString = window.atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+  }
+
+  private handleWebSocketMessage(raw: string) {
+    try {
+      const msg = JSON.parse(raw);
+
+      if (msg.type === 'connection_ack') {
+        return;
+      }
+
+      if (msg.type === 'text_processed' && msg.requestId) {
+        const handler = this.pendingTextRequests.get(msg.requestId);
+        if (handler) {
+          handler.resolve(msg.data);
+          this.pendingTextRequests.delete(msg.requestId);
+        }
+        return;
+      }
+
+      if (msg.type === 'stream_event' && msg.requestId) {
+        const handler = this.streamCallbacks.get(msg.requestId);
+        const options = handler?.options;
+
+        if (msg.event === 'start') {
+          this.lastOriginalText = msg.text || '';
+          this.lastNormalizedText = msg.normalized_text || msg.text || '';
+          this.lastDetectedLanguage = (msg.detected_language as DetectedVoiceLanguage) || 'en';
+          this.nextChunkScheduledTime = 0;
+          this.startSpeechPlayback(options);
+        } else if (msg.event === 'chunk') {
+          if (msg.audio_base64) {
+            this.queueAudioChunk(msg.audio_base64, Boolean(msg.is_last), options);
+          }
+        } else if (msg.event === 'end') {
+          if (this.activeAudioSources.length === 0) {
+            this.finishSpeech(options);
+          }
+          if (handler) {
+            handler.resolve(true);
+            this.streamCallbacks.delete(msg.requestId);
+          }
+          this.currentStreamRequestId = null;
+        } else if (msg.event === 'error') {
+          console.warn('[UltronVoice] Streaming error from backend:', msg.error);
+          if (handler) {
+            handler.reject(new Error(msg.error));
+            this.streamCallbacks.delete(msg.requestId);
+          }
+          this.currentStreamRequestId = null;
+          if (options?.onError) options.onError();
+          this.finishSpeech(options);
+        }
+      }
+    } catch (err) {
+      console.warn('[UltronVoice] Error parsing WS message:', err);
+    }
+  }
+
+  private startSpeechPlayback(options?: VoiceSpeakOptions) {
+    this.isSpeaking = true;
+    audioEchoGuard.onSpeechStart(this.lastNormalizedText || this.lastOriginalText);
+    this.playVocalClick('OPEN');
+    this.startSubBassResonance(this.lastDetectedLanguage === 'hi' || this.lastDetectedLanguage === 'en-IN');
+    if (options?.onStart) options.onStart();
+  }
+
+  private queueAudioChunk(b64Audio: string, isLast: boolean, options?: VoiceSpeakOptions) {
+    this.chunkDecodeQueue = this.chunkDecodeQueue.then(async () => {
+      const ctx = this.getAudioContext();
+      if (!ctx) return;
+      try {
+        const arrayBuffer = this.base64ToArrayBuffer(b64Audio);
+        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+
+        const gainNode = ctx.createGain();
+        gainNode.gain.setValueAtTime(this.volume, ctx.currentTime);
+
+        source.connect(gainNode);
+        gainNode.connect(ctx.destination);
+
+        const now = ctx.currentTime;
+        const startTime = Math.max(now, this.nextChunkScheduledTime);
+        source.start(startTime);
+        this.nextChunkScheduledTime = startTime + audioBuffer.duration;
+
+        this.activeAudioSources.push(source);
+
+        source.onended = () => {
+          this.activeAudioSources = this.activeAudioSources.filter((s) => s !== source);
+          if (isLast && this.activeAudioSources.length === 0) {
+            this.finishSpeech(options);
+          }
+        };
+      } catch (err) {
+        console.warn('[UltronVoice] Error playing chunk:', err);
+        if (isLast && this.activeAudioSources.length === 0) {
+          this.finishSpeech(options);
+        }
+      }
+    });
+  }
+
+  private finishSpeech(options?: VoiceSpeakOptions) {
+    this.isSpeaking = false;
+    audioEchoGuard.onSpeechEnd();
+    this.stopSubBassResonance();
+    this.playVocalClick('CLOSE');
+    if (options?.onEnd) options.onEnd();
   }
 
   private getAudioContext(): AudioContext | null {
@@ -283,6 +490,9 @@ class UltronVoiceEngine {
    * Generates Ultron's metallic acoustic shutter click
    */
   private playVocalClick(type: 'OPEN' | 'CLOSE') {
+    // In clear voice mode or female JARVIS persona, do not play robotic clicks
+    if (this.clearVoiceMode || this.activeProfile !== 'ULTRON_PRIME') return;
+
     const ctx = this.getAudioContext();
     if (!ctx) return;
     try {
@@ -316,6 +526,9 @@ class UltronVoiceEngine {
    * When speaking Hindi or Hinglish, sub-bass is moderated to guarantee vocal clarity and eliminate distortion.
    */
   private startSubBassResonance(isHindiOrHinglish: boolean = false) {
+    // In clear voice mode or female JARVIS persona, do not play low-end drone
+    if (this.clearVoiceMode || this.activeProfile !== 'ULTRON_PRIME') return;
+
     const ctx = this.getAudioContext();
     if (!ctx) return;
     try {
@@ -376,9 +589,132 @@ class UltronVoiceEngine {
   }
 
   /**
-   * Speaks text with correct pronunciation in Hindi, Hinglish, or English
+   * Streams audio data from the Python Voice Microservice to the frontend via WebSocket.
+   */
+  public streamSpeech(text: string, options?: VoiceSpeakOptions): Promise<boolean> {
+    return this.streamSpeechViaWebSocket(text, options);
+  }
+
+  private streamSpeechViaWebSocket(text: string, options?: VoiceSpeakOptions): Promise<boolean> {
+    if (this.isMuted || !text.trim()) {
+      if (options?.onStart) options.onStart();
+      setTimeout(() => {
+        if (options?.onEnd) options.onEnd();
+      }, 400);
+      return Promise.resolve(true);
+    }
+
+    // Stop ongoing speech before beginning new stream
+    this.stop();
+
+    const ctx = this.getAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+
+    return new Promise((resolve, reject) => {
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        reject(new Error('WebSocket connection is not open'));
+        return;
+      }
+
+      const reqId = `voice-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      this.currentStreamRequestId = reqId;
+      this.streamCallbacks.set(reqId, { options, resolve, reject });
+
+      const payload = {
+        type: 'synthesize',
+        requestId: reqId,
+        text: text.trim(),
+        options: {
+          pitch: options?.pitch ?? this.pitch,
+          rate: options?.rate ?? this.rate,
+          volume: options?.volume ?? this.volume,
+          language_mode: options?.languageMode ?? this.languageMode,
+          profile: this.activeProfile,
+          enhance_pronunciation: options?.enhancePronunciation ?? this.pronunciationEnhancementEnabled,
+          chunk_duration_ms: 120.0,
+        },
+      };
+
+      this.ws.send(JSON.stringify(payload));
+    });
+  }
+
+  /**
+   * Invokes advanced phonetic text processing and cadence analysis via the Python Microservice
+   */
+  public processTextWithMicroservice(text: string, options?: any): Promise<any> {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      return Promise.reject(new Error('WebSocket is not connected'));
+    }
+    const reqId = `txt-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    return new Promise((resolve, reject) => {
+      this.pendingTextRequests.set(reqId, { resolve, reject });
+      this.ws!.send(JSON.stringify({
+        type: 'process_text',
+        requestId: reqId,
+        text,
+        options,
+      }));
+    });
+  }
+
+  /**
+   * Returns whether the WebSocket stream to the Python Voice Microservice is active
+   */
+  public isWebSocketConnected(): boolean {
+    return this.isWsConnected;
+  }
+
+  /**
+   * Telemetry on the WebSocket streaming audio subsystem
+   */
+  public getStreamingStatus() {
+    return {
+      connected: this.isWsConnected,
+      isStreaming: this.isSpeaking,
+      activeSourcesCount: this.activeAudioSources.length,
+      activeProfile: this.activeProfile,
+      languageMode: this.languageMode,
+      sampleRate: 24000,
+    };
+  }
+
+  /**
+   * Speaks text with correct pronunciation in Hindi, Hinglish, or English.
+   * Streams audio data via WebSocket from Python microservice when connected,
+   * with seamless fallback to browser Web Speech API.
    */
   public speak(
+    text: string,
+    options?: VoiceSpeakOptions
+  ) {
+    if (this.isMuted || !text.trim()) {
+      if (options?.onStart) options.onStart();
+      setTimeout(() => {
+        if (options?.onEnd) options.onEnd();
+      }, 1000);
+      return;
+    }
+
+    // Try WebSocket streaming from Python microservice first if connected
+    if (this.isWsConnected && this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.streamSpeechViaWebSocket(text, options).catch((err) => {
+        console.warn('[UltronVoice] WebSocket streaming failed, using fallback Web Speech API:', err.message);
+        this.speakViaWebSpeech(text, options);
+      });
+      return;
+    }
+
+    // Fallback to local browser speech synthesis
+    this.speakViaWebSpeech(text, options);
+  }
+
+  /**
+   * Local browser Web Speech API synthesis fallback
+   */
+  public speakViaWebSpeech(
     text: string,
     options?: VoiceSpeakOptions
   ) {
@@ -436,11 +772,8 @@ class UltronVoiceEngine {
       utterance.voice = this.voice;
     }
 
-    // Correct locale tag is crucial for browser synthesizer's internal phonetic dictionary
     utterance.lang = options?.lang || pronunciation.recommendedLocale;
 
-    // Acoustic parameters:
-    // If Hindi or Hinglish, use optimized crisp pitch (0.90-1.0) so vowels don't mumble
     if (pronunciation.isHindi) {
       utterance.pitch = options?.pitch !== undefined ? options.pitch : Math.max(0.85, this.pitch);
       utterance.rate = options?.rate !== undefined ? options.rate : 0.94;
@@ -485,9 +818,24 @@ class UltronVoiceEngine {
   }
 
   /**
-   * Cancels current active speech immediately
+   * Cancels current active speech and streaming immediately
    */
   public stop() {
+    if (this.currentStreamRequestId && this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        type: 'cancel',
+        requestId: this.currentStreamRequestId,
+      }));
+    }
+    for (const src of this.activeAudioSources) {
+      try {
+        src.stop();
+      } catch (_) {}
+    }
+    this.activeAudioSources = [];
+    this.nextChunkScheduledTime = 0;
+    this.chunkDecodeQueue = Promise.resolve();
+
     if (this.synth) {
       this.synth.cancel();
     }
@@ -659,6 +1007,14 @@ class UltronVoiceEngine {
 
   public getIsMuted(): boolean {
     return this.isMuted;
+  }
+
+  public getClearVoiceMode(): boolean {
+    return this.clearVoiceMode;
+  }
+
+  public setClearVoiceMode(enabled: boolean) {
+    this.clearVoiceMode = enabled;
   }
 
   public getVoiceName(): string {

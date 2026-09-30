@@ -106,6 +106,11 @@ export default function App() {
   const [notificationPulseKey, setNotificationPulseKey] = useState<number>(0);
   const [latestNotification, setLatestNotification] = useState<NotificationItem | null>(null);
 
+  // Auto-Speech Continuous Conversation State
+  const [isAutoSpeechActive, setIsAutoSpeechActive] = useState<boolean>(false);
+  const isAutoSpeechActiveRef = useRef<boolean>(false);
+  const handleToggleListeningRef = useRef<((forceState?: boolean) => void) | null>(null);
+
   const speechTimeoutRef = useRef<any>(null);
 
   const handleStateChange = useCallback((newState: AIStateMode) => {
@@ -429,12 +434,23 @@ export default function App() {
                 );
                 speechTimeoutRef.current = setTimeout(() => {
                   handleStateChange('IDLE');
+                  // Continuous conversational loop in auto-speech mode
+                  if (isAutoSpeechActiveRef.current && handleToggleListeningRef.current) {
+                    setTimeout(() => {
+                      handleToggleListeningRef.current?.(true);
+                    }, 400);
+                  }
                 }, 1800);
               },
               onError: () => {
                 handleStateChange('SUCCESS');
                 speechTimeoutRef.current = setTimeout(() => {
                   handleStateChange('IDLE');
+                  if (isAutoSpeechActiveRef.current && handleToggleListeningRef.current) {
+                    setTimeout(() => {
+                      handleToggleListeningRef.current?.(true);
+                    }, 400);
+                  }
                 }, 1800);
               },
             });
@@ -487,6 +503,24 @@ export default function App() {
       }
     }
   }, [isListening, handleStateChange, dispatchNotification, triggerAICycle]);
+
+  handleToggleListeningRef.current = handleToggleListening;
+
+  const handleToggleAutoSpeech = useCallback(() => {
+    setIsAutoSpeechActive((prev) => {
+      const next = !prev;
+      isAutoSpeechActiveRef.current = next;
+      if (next) {
+        soundFx.playSuccess();
+        dispatchNotification('Auto-Speech Conversations Active. Continuous voice chat engaged.', 'SPEECH AI');
+        handleToggleListening(true);
+      } else {
+        soundFx.playClick();
+        dispatchNotification('Auto-Speech Conversations Deactivated.', 'SPEECH AI');
+      }
+      return next;
+    });
+  }, [dispatchNotification, handleToggleListening]);
 
   // Push-to-Talk (Ctrl+Space chord) listener subscription
   React.useEffect(() => {
@@ -542,6 +576,8 @@ export default function App() {
             lastAssistantMessage={lastAssistantMessage}
             controlledEmote={controlledEmote}
             onEmoteChange={(emote) => setControlledEmote(emote)}
+            isAutoSpeechActive={isAutoSpeechActive}
+            onToggleAutoSpeech={handleToggleAutoSpeech}
             onGestureTrigger={(gesture: LearnedGesture) => {
               dispatchNotification(
                 `Optical Gesture Recognized: "${gesture.name}" -> ${gesture.triggerAction}`,

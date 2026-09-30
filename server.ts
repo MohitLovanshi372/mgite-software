@@ -4,12 +4,15 @@
  */
 
 import express from 'express';
+import http from 'http';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { apiRouter } from './server/apiRouter.ts';
+import { setupVoiceWebSocketServer } from './server/voiceWebSocketServer.ts';
 
 async function startServer() {
   const app = express();
+  const server = http.createServer(app);
   const PORT = 3000;
 
   app.use(express.json({ limit: '10mb' }));
@@ -17,6 +20,9 @@ async function startServer() {
 
   // API routes FIRST
   app.use(apiRouter);
+
+  // Attach WebSocket server for real-time voice streaming
+  setupVoiceWebSocketServer(server);
 
   // Vite middleware for development vs static build in production
   if (process.env.NODE_ENV !== 'production') {
@@ -33,7 +39,7 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  server.listen(PORT, '0.0.0.0', () => {
     console.log(`Personal AI Assistant server running on http://0.0.0.0:${PORT}`);
   });
 }

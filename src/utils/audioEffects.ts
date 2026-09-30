@@ -151,6 +151,10 @@ class SoundSynthesizer {
     }
   }
 
+  public playSuccess() {
+    this.playStateSound('SUCCESS');
+  }
+
   public playClick() {
     const ctx = this.getContext();
     if (!ctx) return;

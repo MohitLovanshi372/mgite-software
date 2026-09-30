@@ -531,21 +531,38 @@ export class SpeechTextNormalizer {
   private static optimizeLanguageCadence(text: string, lang: 'hi' | 'hinglish' | 'en'): string {
     let result = text;
 
+    // Currencies
+    result = result.replace(/₹\s*(\d+)/g, '$1 rupaye');
+    result = result.replace(/Rs\.?\s*(\d+)/gi, '$1 rupaye');
+    result = result.replace(/\$\s*(\d+)/g, '$1 dollars');
+
     if (lang === 'hi') {
       // Replace Hindi danda (।) and double danda (॥) with standard cadence pause
       result = result.replace(/।/g, '. ').replace(/॥/g, '. ');
 
       // Percentage symbol to Hindi
       result = result.replace(/(\d+)\s*%/g, '$1 प्रतिशत');
+
+      // Unit spacing
+      result = result.replace(/(\d+)\s*(GB|MB|TB|KB)\b/gi, '$1 $2');
+      result = result.replace(/(\d+)\s*(GHz|MHz)\b/gi, '$1 $2');
     } else if (lang === 'hinglish') {
       // Ensure Hinglish sentences end with clean pauses
       result = result.replace(/([.!?])\s*/g, '$1 ');
 
       // Percentage symbol
       result = result.replace(/(\d+)\s*%/g, '$1 percent');
+
+      // Unit spacing
+      result = result.replace(/(\d+)\s*(GB|MB|TB|KB)\b/gi, '$1 $2');
+      result = result.replace(/(\d+)\s*(GHz|MHz)\b/gi, '$1 $2');
     } else {
       // English percentages
       result = result.replace(/(\d+)\s*%/g, '$1 percent');
+
+      // Unit spacing
+      result = result.replace(/(\d+)\s*(GB|MB|TB|KB)\b/gi, '$1 $2');
+      result = result.replace(/(\d+)\s*(GHz|MHz)\b/gi, '$1 $2');
     }
 
     return result;
