@@ -31,8 +31,19 @@ class FishAudioTTSProvider:
         model: str = DEFAULT_MODEL,
         endpoint: str = DEFAULT_ENDPOINT
     ):
-        self.api_key = api_key
-        self.voice_id = voice_id
+        import os
+        raw_key = (api_key or os.getenv("FISH_API_KEY", "") or os.getenv("FISH_AUDIO_API_KEY", "")).strip()
+        raw_voice = (voice_id or os.getenv("FISH_VOICE_ID", "") or os.getenv("FISH_AUDIO_REFERENCE_ID", "")).strip()
+        if " " in raw_key:
+            parts = raw_key.split()
+            found_key = next((p for p in parts if p.startswith("sk-") or len(p) > 40), parts[0])
+            found_ref = next((p for p in parts if len(p) == 32), None)
+            raw_key = found_key
+            if found_ref and not raw_voice:
+                raw_voice = found_ref
+
+        self.api_key = raw_key
+        self.voice_id = raw_voice or "817eba7f1aea469f9802326568d427b9"
         self.model = model or self.DEFAULT_MODEL
         self.endpoint = endpoint
         self._mock_handler: Optional[Callable[[Dict[str, Any]], Any]] = None
@@ -73,7 +84,6 @@ class FishAudioTTSProvider:
             "text": speech_text,
             "reference_id": target_voice,
             "format": "mp3",
-            "model": self.model,
         }
         self.last_dispatch_payload = payload
 
@@ -95,6 +105,7 @@ class FishAudioTTSProvider:
             headers={
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
+                "model": self.model,
                 "User-Agent": "JARVIS-Python/1.0",
             },
             method="POST"
@@ -102,7 +113,10 @@ class FishAudioTTSProvider:
 
         try:
             with urllib.request.urlopen(req, timeout=15) as response:
-                return response.read()
+                audio_data = response.read()
+                if not audio_data or len(audio_data) == 0:
+                    raise RuntimeError("Fish Audio API returned empty audio response (0 bytes).")
+                return audio_data
         except urllib.error.HTTPError as e:
             err_msg = f"Fish Audio HTTP {e.code}: {e.reason}"
             if self.api_key:

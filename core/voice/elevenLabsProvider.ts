@@ -64,6 +64,12 @@ export class ElevenLabsTTSProvider implements TextToSpeechProvider {
   // Pluggable client (official ElevenLabsClient instance or mock)
   private client: ElevenLabsClient | any | null = null;
   private lastDispatchPayload: any = null;
+  private cachedVoices: SpeechVoice[] | null = null;
+  private hasRemoteVoiceFetchFailed = false;
+  private hasAuthError = false;
+
+  private static cachedVoicesGlobal: SpeechVoice[] | null = null;
+  private static hasRemoteFetchFailedGlobal = false;
 
   constructor(config: ElevenLabsProviderConfig = {}) {
     this.apiKey = config.apiKey !== undefined ? config.apiKey : (process.env.ELEVENLABS_API_KEY || '');
@@ -75,7 +81,7 @@ export class ElevenLabsTTSProvider implements TextToSpeechProvider {
       try {
         this.client = new ElevenLabsClient({ apiKey: this.apiKey });
       } catch (err: any) {
-        logger.error('ElevenLabsProvider', `Failed to initialize ElevenLabs client: ${err.message}`);
+        logger.warn('ElevenLabsProvider', `Failed to initialize ElevenLabs client: ${err.message}`);
       }
     }
   }
@@ -84,9 +90,20 @@ export class ElevenLabsTTSProvider implements TextToSpeechProvider {
    * Check if ElevenLabs is configured with an API key and voice ID.
    */
   public isAvailable(): boolean {
+    if (this.hasAuthError) {
+      return false;
+    }
     const hasKey = Boolean(this.apiKey && this.apiKey.trim().length > 0);
     const hasVoice = Boolean(this.voiceId && this.voiceId.trim().length > 0);
     return hasKey && hasVoice;
+  }
+
+  public getHasAuthError(): boolean {
+    return this.hasAuthError;
+  }
+
+  public setHasAuthError(hasError: boolean): void {
+    this.hasAuthError = hasError;
   }
 
   public isSpeaking(): boolean {
@@ -173,10 +190,14 @@ export class ElevenLabsTTSProvider implements TextToSpeechProvider {
    */
   public setMockClient(mockClient: any): void {
     this.client = mockClient;
+    this.cachedVoices = null;
+    this.hasRemoteVoiceFetchFailed = false;
   }
 
   public setApiKey(apiKey: string): void {
     this.apiKey = apiKey;
+    this.cachedVoices = null;
+    this.hasRemoteVoiceFetchFailed = false;
     if (apiKey) {
       try {
         this.client = new ElevenLabsClient({ apiKey });
@@ -197,9 +218,18 @@ export class ElevenLabsTTSProvider implements TextToSpeechProvider {
 
   /**
    * Returns list of configured/available ElevenLabs voices.
+   * Caches catalog on 401 or network failure to prevent repeated warning spam.
    */
   public async getVoices(): Promise<SpeechVoice[]> {
-    if (this.client?.voices?.getAll) {
+    if (this.cachedVoices && this.cachedVoices.length > 0) {
+      return this.cachedVoices;
+    }
+    if (ElevenLabsTTSProvider.cachedVoicesGlobal && ElevenLabsTTSProvider.cachedVoicesGlobal.length > 0) {
+      this.cachedVoices = ElevenLabsTTSProvider.cachedVoicesGlobal;
+      return this.cachedVoices;
+    }
+
+    if (!this.hasRemoteVoiceFetchFailed && !ElevenLabsTTSProvider.hasRemoteFetchFailedGlobal && this.client?.voices?.getAll) {
       try {
         const response = await this.client.voices.getAll();
         const voices = (response.voices || response || []).map((v: any) => ({
@@ -208,20 +238,30 @@ export class ElevenLabsTTSProvider implements TextToSpeechProvider {
           lang: v.labels?.accent || v.labels?.language || 'multilingual',
           isDefault: v.voice_id === this.voiceId,
         }));
-        if (voices.length > 0) return voices;
+        if (voices.length > 0) {
+          this.cachedVoices = voices;
+          ElevenLabsTTSProvider.cachedVoicesGlobal = voices;
+          return voices;
+        }
       } catch (err: any) {
-        logger.warn('ElevenLabsProvider', `Failed to fetch remote voices, returning standard catalog: ${err.message}`);
+        this.hasRemoteVoiceFetchFailed = true;
+        ElevenLabsTTSProvider.hasRemoteFetchFailedGlobal = true;
+        this.hasAuthError = true;
+        logger.warn('ElevenLabsProvider', `Remote voice catalog unavailable (${err.message}). Using standard catalog.`);
       }
     }
 
     // Default catalog of popular multilingual / Indian compatible voices
-    return [
+    const defaultCatalog: SpeechVoice[] = [
       { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel (Multilingual)', lang: 'en-US / hi-IN', isDefault: true },
       { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella (Multilingual Hindi/English)', lang: 'multilingual' },
       { id: 'ErXwobaYiN019PkySvjV', name: 'Antoni (Multilingual)', lang: 'multilingual' },
       { id: 'AZnzlk1XvdvUeBnXmlld', name: 'Domi (Multilingual)', lang: 'multilingual' },
       { id: 'custom_elevenlabs_hindi', name: 'Kavita (Indian English & Hindi)', lang: 'hi-IN' },
     ];
+    this.cachedVoices = defaultCatalog;
+    ElevenLabsTTSProvider.cachedVoicesGlobal = defaultCatalog;
+    return defaultCatalog;
   }
 
   /**
@@ -337,7 +377,18 @@ export class ElevenLabsTTSProvider implements TextToSpeechProvider {
       const safeErrorMsg = err?.message || 'ElevenLabs synthesis failed';
       // Ensure API keys are never leaked in error messages or logs
       const sanitizedError = safeErrorMsg.replace(new RegExp(activeKey, 'g'), '[REDACTED_API_KEY]');
-      logger.error('ElevenLabsProvider', `Synthesis failed: ${sanitizedError}`);
+      if (
+        sanitizedError.includes('401') ||
+        sanitizedError.includes('402') ||
+        sanitizedError.includes('403') ||
+        sanitizedError.includes('unauthorized') ||
+        sanitizedError.includes('permission')
+      ) {
+        this.hasAuthError = true;
+        logger.warn('ElevenLabsProvider', `ElevenLabs API unavailable (${sanitizedError}). Routing to fallback voice.`);
+      } else {
+        logger.error('ElevenLabsProvider', `Synthesis failed: ${sanitizedError}`);
+      }
       if (options?.onError) options.onError(new Error(sanitizedError));
       throw new Error(sanitizedError);
     }

@@ -14,12 +14,12 @@ class VoiceConfig:
     enabled: bool = True
     auto_speak: bool = False
     preferred_language: str = "auto"
-    tts_provider: str = os.getenv("TTS_PROVIDER", "fish_audio")
+    tts_provider: str = "fish_audio"
     
     # Fish Audio Settings
-    fish_api_key: str = field(default_factory=lambda: os.getenv("FISH_API_KEY", ""))
+    fish_api_key: str = field(default_factory=lambda: os.getenv("FISH_API_KEY", "") or os.getenv("FISH_AUDIO_API_KEY", ""))
     fish_model: str = os.getenv("FISH_MODEL", "s2.1-pro-free")
-    fish_voice_id: str = os.getenv("FISH_VOICE_ID", "")
+    fish_voice_id: str = os.getenv("FISH_VOICE_ID", "") or os.getenv("FISH_AUDIO_REFERENCE_ID", "") or "817eba7f1aea469f9802326568d427b9"
     
     # ElevenLabs Settings
     elevenlabs_api_key: str = field(default_factory=lambda: os.getenv("ELEVENLABS_API_KEY", ""))

@@ -1,0 +1,2 @@
+# Minimum required dependencies for JARVIS Voice
+pygame>=2.5.0

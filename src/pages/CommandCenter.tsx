@@ -78,8 +78,8 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
               : 'text-slate-400 hover:text-white'
           }`}
         >
-          <User className="w-3 h-3" />
-          <span>AVATAR</span>
+          <Sparkles className="w-3 h-3 text-cyan-400" />
+          <span>STAR UNIVERSE</span>
         </button>
 
         <button

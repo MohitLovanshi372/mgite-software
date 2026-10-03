@@ -31,13 +31,12 @@ import { WebSpeechTTSProvider } from './webSpeechProvider.ts';
 import { MockTextToSpeechProvider } from './mockSpeechProvider.ts';
 import { PrivacyFilter } from '../security/privacyFilter.ts';
 import { LanguageDetector, LanguageDetectionResult } from './languageDetector.ts';
-import { SpeechTextNormalizer, SpeechNormalizationResult } from './speechTextNormalizer.ts';
 import { getConfig } from '../../config/settings.ts';
 import { logger } from '../logger.ts';
 
 export interface TTSDispatchResult {
   success: boolean;
-  providerUsed: 'fish_audio' | 'elevenlabs' | 'system' | 'local' | 'mock' | 'none';
+  providerUsed: 'fishaudio' | 'fish_audio' | 'elevenlabs' | 'system' | 'local' | 'mock' | 'none';
   fallbackTriggered: boolean;
   fallbackReason?: string;
   detectedLanguage: 'hi' | 'en' | 'hinglish';
@@ -55,74 +54,51 @@ export class TTSRouter implements TextToSpeechProvider {
   public readonly id = 'tts_router';
   public readonly name = 'TTS Router (Fish Audio, ElevenLabs & Local Fallback)';
 
-  private fishAudioProvider: FishAudioTTSProvider;
   private elevenLabsProvider: ElevenLabsTTSProvider;
+  private fishAudioProvider: FishAudioTTSProvider;
   private localProvider: TextToSpeechProvider;
-  private configuredProvider: string = 'fish_audio';
+  private configuredProvider: string = 'fishaudio';
   private isCurrentlySpeaking = false;
   private offlineMode = false;
   private lastDispatchResult: TTSDispatchResult | null = null;
 
   constructor(
-    first?: FishAudioTTSProvider | ElevenLabsTTSProvider | TextToSpeechProvider,
-    second?: ElevenLabsTTSProvider | TextToSpeechProvider | string,
-    third?: TextToSpeechProvider | string,
-    fourth?: string
+    elevenLabsProvider?: ElevenLabsTTSProvider,
+    localProvider?: TextToSpeechProvider,
+    configuredProvider?: string,
+    fishAudioProvider?: FishAudioTTSProvider
   ) {
-    if (first instanceof FishAudioTTSProvider) {
-      this.fishAudioProvider = first;
-      this.elevenLabsProvider = (second instanceof ElevenLabsTTSProvider) ? second : new ElevenLabsTTSProvider();
-      this.localProvider = (third && typeof third !== 'string') ? third : new WebSpeechTTSProvider();
-      if (typeof third === 'string') {
-        fourth = third;
-      }
-    } else if (first instanceof ElevenLabsTTSProvider) {
-      this.fishAudioProvider = new FishAudioTTSProvider();
-      this.elevenLabsProvider = first;
-      this.localProvider = (second && typeof second !== 'string') ? (second as TextToSpeechProvider) : new WebSpeechTTSProvider();
-      if (typeof second === 'string') {
-        fourth = second;
-      } else if (typeof third === 'string') {
-        fourth = third;
-      }
+    this.elevenLabsProvider = elevenLabsProvider || new ElevenLabsTTSProvider();
+    this.fishAudioProvider = fishAudioProvider || new FishAudioTTSProvider();
+    
+    // Default local provider: WebSpeech if in browser, Mock if in headless/Node
+    if (localProvider) {
+      this.localProvider = localProvider;
     } else {
-      this.fishAudioProvider = new FishAudioTTSProvider();
-      this.elevenLabsProvider = new ElevenLabsTTSProvider();
-      
-      // Default local provider: WebSpeech if in browser, Mock if in headless/Node
-      if (first && typeof first !== 'string') {
-        this.localProvider = first as TextToSpeechProvider;
-      } else if (second && typeof second !== 'string') {
-        this.localProvider = second as TextToSpeechProvider;
-      } else {
-        const web = new WebSpeechTTSProvider();
-        this.localProvider = web.isAvailable() ? web : new MockTextToSpeechProvider();
-      }
-      if (typeof first === 'string') fourth = first;
-      else if (typeof second === 'string') fourth = second;
-      else if (typeof third === 'string') fourth = third;
+      const web = new WebSpeechTTSProvider();
+      this.localProvider = web.isAvailable() ? web : new MockTextToSpeechProvider();
     }
 
     const appConfig = getConfig();
-    this.configuredProvider = fourth || process.env.TTS_PROVIDER || appConfig.voice?.tts_provider || 'fish_audio';
+    this.configuredProvider = configuredProvider || (process.env.TTS_PROVIDER && process.env.TTS_PROVIDER !== 'elevenlabs' ? process.env.TTS_PROVIDER : 'fishaudio') || 'fishaudio';
     this.offlineMode = appConfig.offline_mode ?? false;
   }
 
   public isAvailable(): boolean {
-    const fishAvail = this.fishAudioProvider.isAvailable();
     const elAvail = this.elevenLabsProvider.isAvailable();
+    const fishAvail = this.fishAudioProvider.isAvailable();
     const localAvail = this.localProvider.isAvailable();
-    const isFish = typeof fishAvail === 'boolean' ? fishAvail : true;
     const isEl = typeof elAvail === 'boolean' ? elAvail : true;
+    const isFish = typeof fishAvail === 'boolean' ? fishAvail : true;
     const isLocal = typeof localAvail === 'boolean' ? localAvail : true;
-    return isFish || isEl || isLocal;
+    return isEl || isFish || isLocal;
   }
 
   public isSpeaking(): boolean {
     return (
       this.isCurrentlySpeaking ||
-      this.fishAudioProvider.isSpeaking() ||
       this.elevenLabsProvider.isSpeaking() ||
+      this.fishAudioProvider.isSpeaking() ||
       this.localProvider.isSpeaking()
     );
   }
@@ -131,20 +107,12 @@ export class TTSRouter implements TextToSpeechProvider {
     return this.configuredProvider;
   }
 
-  public setProvider(provider: 'fish_audio' | 'elevenlabs' | 'system' | 'local' | 'mock' | string): void {
+  public setProvider(provider: 'fishaudio' | 'elevenlabs' | 'system' | 'local' | 'mock' | string): void {
     this.configuredProvider = provider;
   }
 
   public setOfflineMode(offline: boolean): void {
     this.offlineMode = offline;
-  }
-
-  public getFishAudioProvider(): FishAudioTTSProvider {
-    return this.fishAudioProvider;
-  }
-
-  public setFishAudioProvider(provider: FishAudioTTSProvider): void {
-    this.fishAudioProvider = provider;
   }
 
   public getElevenLabsProvider(): ElevenLabsTTSProvider {
@@ -153,6 +121,14 @@ export class TTSRouter implements TextToSpeechProvider {
 
   public setElevenLabsProvider(provider: ElevenLabsTTSProvider): void {
     this.elevenLabsProvider = provider;
+  }
+
+  public getFishAudioProvider(): FishAudioTTSProvider {
+    return this.fishAudioProvider;
+  }
+
+  public setFishAudioProvider(provider: FishAudioTTSProvider): void {
+    this.fishAudioProvider = provider;
   }
 
   public getLocalProvider(): TextToSpeechProvider {
@@ -168,11 +144,11 @@ export class TTSRouter implements TextToSpeechProvider {
   }
 
   public async getVoices(): Promise<SpeechVoice[]> {
-    if (this.configuredProvider === 'fish_audio' && this.fishAudioProvider.isAvailable()) {
+    if (this.configuredProvider === 'fishaudio') {
       try {
         return await this.fishAudioProvider.getVoices();
       } catch (e) {
-        // Fallback
+        return await this.localProvider.getVoices();
       }
     }
     if (this.configuredProvider === 'elevenlabs' && this.elevenLabsProvider.isAvailable()) {
@@ -186,26 +162,26 @@ export class TTSRouter implements TextToSpeechProvider {
   }
 
   public setVoice(voiceId: string): void {
-    this.fishAudioProvider.setVoice(voiceId);
     this.elevenLabsProvider.setVoice(voiceId);
+    this.fishAudioProvider.setVoice(voiceId);
     this.localProvider.setVoice(voiceId);
   }
 
   public setLanguage(lang: string): void {
-    this.fishAudioProvider.setLanguage(lang);
     this.elevenLabsProvider.setLanguage(lang);
+    this.fishAudioProvider.setLanguage(lang);
     this.localProvider.setLanguage(lang);
   }
 
   public setRate(rate: number): void {
-    this.fishAudioProvider.setRate(rate);
     this.elevenLabsProvider.setRate(rate);
+    this.fishAudioProvider.setRate(rate);
     this.localProvider.setRate(rate);
   }
 
   public setVolume(volume: number): void {
-    this.fishAudioProvider.setVolume(volume);
     this.elevenLabsProvider.setVolume(volume);
+    this.fishAudioProvider.setVolume(volume);
     this.localProvider.setVolume(volume);
   }
 
@@ -229,23 +205,27 @@ export class TTSRouter implements TextToSpeechProvider {
     return this.elevenLabsProvider.getVoiceSettings();
   }
 
+  public getFishAudioSettings() {
+    return this.fishAudioProvider.getSettings();
+  }
+
   public stop(): void {
     this.isCurrentlySpeaking = false;
-    this.fishAudioProvider.stop();
     this.elevenLabsProvider.stop();
+    this.fishAudioProvider.stop();
     this.localProvider.stop();
   }
 
   public pause(): void {
     this.isCurrentlySpeaking = false;
-    this.fishAudioProvider.pause();
     this.elevenLabsProvider.pause();
+    this.fishAudioProvider.pause();
     this.localProvider.pause();
   }
 
   public resume(): void {
     this.isCurrentlySpeaking = true;
-    if (this.configuredProvider === 'fish_audio') {
+    if (this.configuredProvider === 'fishaudio') {
       this.fishAudioProvider.resume();
     } else if (this.configuredProvider === 'elevenlabs') {
       this.elevenLabsProvider.resume();
@@ -327,23 +307,11 @@ export class TTSRouter implements TextToSpeechProvider {
     }
 
     // =========================================================================
-    // STEP 2: SPEECH TEXT NORMALIZATION LAYER
-    // AI response -> SpeechTextNormalizer -> Language detection -> TTS -> Audio
-    // Guarantees:
-    // - Preserves normal words as complete words (never spells letter-by-letter)
-    // - Keeps technical terms readable: YouTube, Gemini, CPU, GPU, RAM, API, etc.
-    // - Strips markdown, code blocks, raw JSON/tool output
-    // - Replaces URLs with natural phrase ("Link ready hai.")
-    // =========================================================================
-    const normResult: SpeechNormalizationResult = SpeechTextNormalizer.normalize(text);
-    const speechText = normResult.normalizedText || text;
-
-    // =========================================================================
-    // STEP 3: LANGUAGE DETECTION & PRESERVATION
+    // STEP 2: LANGUAGE DETECTION
     // Hindi Devanagari text is preserved ("मुझे आज कॉलेज जाना है।").
     // Hinglish mixed text is preserved ("आज मेरा project complete हो गया।").
     // =========================================================================
-    const langInfo: LanguageDetectionResult = LanguageDetector.detect(speechText);
+    const langInfo: LanguageDetectionResult = LanguageDetector.detect(text);
 
     const speakOptions: SpeakOptions = {
       ...options,
@@ -351,19 +319,19 @@ export class TTSRouter implements TextToSpeechProvider {
     };
 
     const config = getConfig();
-    const effectiveProvider = this.configuredProvider || process.env.TTS_PROVIDER || config.voice?.tts_provider || 'elevenlabs';
+    const effectiveProvider = this.configuredProvider || config.voice?.tts_provider || 'fishaudio';
     const isOffline = this.offlineMode || config.offline_mode;
 
     this.isCurrentlySpeaking = true;
 
     // =========================================================================
-    // STEP 4: ROUTING RULES
+    // STEP 3: ROUTING RULES
     // Rule 3: If offline -> Local/System TTS directly
     // =========================================================================
     if (isOffline) {
       logger.info('TTSRouter', 'Offline mode active: Routing directly to Local/System TTS.');
       try {
-        await this.localProvider.speak(speechText, speakOptions);
+        await this.localProvider.speak(text, speakOptions);
         const result: TTSDispatchResult = {
           success: true,
           providerUsed: (this.localProvider.id as any) || 'local',
@@ -372,9 +340,7 @@ export class TTSRouter implements TextToSpeechProvider {
           detectedLanguage: langInfo.language,
           languageCode: langInfo.languageCode,
           blockedByPrivacy: false,
-          text: speechText,
-          originalText: text,
-          normalizedText: speechText,
+          text,
           textOnly: false,
         };
         this.lastDispatchResult = result;
@@ -382,61 +348,57 @@ export class TTSRouter implements TextToSpeechProvider {
         return result;
       } catch (localErr: any) {
         logger.warn('TTSRouter', `Local TTS failed in offline mode: ${localErr.message}`);
-        return this.fallbackToTextOnly(speechText, langInfo, 'Offline mode with local TTS error', text);
+        return this.fallbackToTextOnly(text, langInfo, 'Offline mode with local TTS error');
       }
     }
 
     // =========================================================================
-    // Rule 1: If TTS_PROVIDER=fish_audio
-    // Flow: Assistant response -> SpeechTextNormalizer -> FishAudioTTSProvider -> Audio -> Speaker
-    // Fallback: Fish Audio fails -> try existing ElevenLabs provider -> if both fail, display text without audio.
+    // Rule 1a: If TTS_PROVIDER=fishaudio and API is available -> Fish Audio
     // =========================================================================
-    if (effectiveProvider === 'fish_audio') {
-      const isFishAvailable = this.fishAudioProvider.isAvailable();
+    if (effectiveProvider === 'fishaudio') {
+      const isFishAudioAvailable = this.fishAudioProvider.isAvailable();
 
-      if (isFishAvailable) {
+      if (isFishAudioAvailable) {
         try {
-          await this.fishAudioProvider.speak(speechText, speakOptions);
+          await this.fishAudioProvider.speak(text, speakOptions);
           const result: TTSDispatchResult = {
             success: true,
-            providerUsed: 'fish_audio',
+            providerUsed: 'fishaudio',
             fallbackTriggered: false,
             detectedLanguage: langInfo.language,
             languageCode: langInfo.languageCode,
             blockedByPrivacy: false,
-            text: speechText,
-            originalText: text,
-            normalizedText: speechText,
+            text,
             textOnly: false,
           };
           this.lastDispatchResult = result;
           this.isCurrentlySpeaking = false;
           return result;
-        } catch (fishErr: any) {
+        } catch (fishAudioErr: any) {
           logger.warn(
             'TTSRouter',
-            `Fish Audio TTS failed (${fishErr.message}). Initiating fallback to ElevenLabs.`
+            `Fish Audio TTS failed (${fishAudioErr.message}). Initiating graceful fallback to Local/System TTS.`
           );
-          return await this.fallbackFromFishAudio(speechText, speakOptions, langInfo, fishErr.message, text);
+          return await this.fallbackToLocal(text, speakOptions, langInfo, fishAudioErr.message);
         }
       } else {
         logger.warn(
           'TTSRouter',
-          'Fish Audio configured but unavailable (missing API key). Initiating fallback to ElevenLabs.'
+          'Fish Audio configured but unavailable (missing API key). Falling back to Local/System TTS.'
         );
-        return await this.fallbackFromFishAudio(speechText, speakOptions, langInfo, 'fish_audio_unavailable', text);
+        return await this.fallbackToLocal(text, speakOptions, langInfo, 'fishaudio_credentials_missing');
       }
     }
 
     // =========================================================================
-    // Rule 2: If TTS_PROVIDER=elevenlabs and API is available -> ElevenLabs
+    // Rule 1b: If TTS_PROVIDER=elevenlabs and API is available -> ElevenLabs
     // =========================================================================
     if (effectiveProvider === 'elevenlabs') {
       const isElevenLabsAvailable = this.elevenLabsProvider.isAvailable();
 
       if (isElevenLabsAvailable) {
         try {
-          await this.elevenLabsProvider.speak(speechText, speakOptions);
+          await this.elevenLabsProvider.speak(text, speakOptions);
           const result: TTSDispatchResult = {
             success: true,
             providerUsed: 'elevenlabs',
@@ -444,9 +406,7 @@ export class TTSRouter implements TextToSpeechProvider {
             detectedLanguage: langInfo.language,
             languageCode: langInfo.languageCode,
             blockedByPrivacy: false,
-            text: speechText,
-            originalText: text,
-            normalizedText: speechText,
+            text,
             textOnly: false,
           };
           this.lastDispatchResult = result;
@@ -458,7 +418,7 @@ export class TTSRouter implements TextToSpeechProvider {
             'TTSRouter',
             `ElevenLabs TTS failed (${elevenLabsErr.message}). Initiating graceful fallback to Local/System TTS.`
           );
-          return await this.fallbackToLocal(speechText, speakOptions, langInfo, elevenLabsErr.message, text);
+          return await this.fallbackToLocal(text, speakOptions, langInfo, elevenLabsErr.message);
         }
       } else {
         // ElevenLabs missing key or voice -> fallback to local
@@ -466,14 +426,14 @@ export class TTSRouter implements TextToSpeechProvider {
           'TTSRouter',
           'ElevenLabs configured but unavailable (missing API key or voice). Falling back to Local/System TTS.'
         );
-        return await this.fallbackToLocal(speechText, speakOptions, langInfo, 'elevenlabs_credentials_missing', text);
+        return await this.fallbackToLocal(text, speakOptions, langInfo, 'elevenlabs_credentials_missing');
       }
     }
 
     // If configured provider is local/system directly
     if (this.localProvider.isAvailable()) {
       try {
-        await this.localProvider.speak(speechText, speakOptions);
+        await this.localProvider.speak(text, speakOptions);
         const result: TTSDispatchResult = {
           success: true,
           providerUsed: (this.localProvider.id as any) || 'local',
@@ -481,66 +441,19 @@ export class TTSRouter implements TextToSpeechProvider {
           detectedLanguage: langInfo.language,
           languageCode: langInfo.languageCode,
           blockedByPrivacy: false,
-          text: speechText,
-          originalText: text,
-          normalizedText: speechText,
+          text,
           textOnly: false,
         };
         this.lastDispatchResult = result;
         this.isCurrentlySpeaking = false;
         return result;
       } catch (err: any) {
-        return this.fallbackToTextOnly(speechText, langInfo, err.message, text);
+        return this.fallbackToTextOnly(text, langInfo, err.message);
       }
     }
 
     // Rule 4: If no TTS provider is available -> text-only response (never crash)
-    return this.fallbackToTextOnly(speechText, langInfo, 'no_tts_provider_available', text);
-  }
-
-  /**
-   * Fish Audio Fallback Pipeline:
-   * Fish Audio fails -> try existing ElevenLabs provider -> if both fail, display text without audio.
-   */
-  private async fallbackFromFishAudio(
-    text: string,
-    options: SpeakOptions,
-    langInfo: LanguageDetectionResult,
-    reason: string,
-    originalText?: string
-  ): Promise<TTSDispatchResult> {
-    // 1. Try ElevenLabs provider
-    if (this.elevenLabsProvider.isAvailable()) {
-      try {
-        await this.elevenLabsProvider.speak(text, options);
-        const result: TTSDispatchResult = {
-          success: true,
-          providerUsed: 'elevenlabs',
-          fallbackTriggered: true,
-          fallbackReason: `fish_audio_failed: ${reason}`,
-          detectedLanguage: langInfo.language,
-          languageCode: langInfo.languageCode,
-          blockedByPrivacy: false,
-          text,
-          originalText: originalText || text,
-          normalizedText: text,
-          textOnly: false,
-        };
-        this.lastDispatchResult = result;
-        this.isCurrentlySpeaking = false;
-        return result;
-      } catch (elevenLabsErr: any) {
-        logger.warn('TTSRouter', `ElevenLabs fallback also failed: ${elevenLabsErr.message}`);
-      }
-    }
-
-    // 2. If both fail, display text without audio
-    return this.fallbackToTextOnly(
-      text,
-      langInfo,
-      `Both Fish Audio and ElevenLabs failed: ${reason}`,
-      originalText
-    );
+    return this.fallbackToTextOnly(text, langInfo, 'no_tts_provider_available');
   }
 
   /**
@@ -550,8 +463,7 @@ export class TTSRouter implements TextToSpeechProvider {
     text: string,
     options: SpeakOptions,
     langInfo: LanguageDetectionResult,
-    reason: string,
-    originalText?: string
+    reason: string
   ): Promise<TTSDispatchResult> {
     try {
       if (this.localProvider.isAvailable()) {
@@ -565,8 +477,6 @@ export class TTSRouter implements TextToSpeechProvider {
           languageCode: langInfo.languageCode,
           blockedByPrivacy: false,
           text,
-          originalText: originalText || text,
-          normalizedText: text,
           textOnly: false,
         };
         this.lastDispatchResult = result;
@@ -578,7 +488,7 @@ export class TTSRouter implements TextToSpeechProvider {
     }
 
     // Rule 4: Fallback to text-only if local also unavailable
-    return this.fallbackToTextOnly(text, langInfo, `Local fallback failed: ${reason}`, originalText);
+    return this.fallbackToTextOnly(text, langInfo, `Local fallback failed: ${reason}`);
   }
 
   /**
@@ -587,8 +497,7 @@ export class TTSRouter implements TextToSpeechProvider {
   private fallbackToTextOnly(
     text: string,
     langInfo: LanguageDetectionResult,
-    reason: string,
-    originalText?: string
+    reason: string
   ): TTSDispatchResult {
     this.isCurrentlySpeaking = false;
     logger.info('TTSRouter', `Graceful text-only response active: ${reason}`);
@@ -601,8 +510,6 @@ export class TTSRouter implements TextToSpeechProvider {
       languageCode: langInfo.languageCode,
       blockedByPrivacy: false,
       text,
-      originalText: originalText || text,
-      normalizedText: text,
       textOnly: true,
     };
     this.lastDispatchResult = result;

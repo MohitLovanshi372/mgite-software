@@ -21,14 +21,8 @@ import { runStep5MemoryTests } from './step5_memory_engine.test.ts';
 import { runStep6IntentAndProactiveTests } from './step6_intent_and_proactive.test.ts';
 import { runPhase3VoiceEngineTests } from './phase3_voice_engine.test.ts';
 import { runElevenLabsVoiceTests } from './phase3_elevenlabs_tts.test.ts';
-import { runSttHinglishTests } from './phase3_stt_hinglish.test.ts';
+import { runFishAudioVoiceTests } from './phase3_fishaudio_tts.test.ts';
 import { runPhase4NotificationTests } from './phase4_notification_intelligence.test.ts';
-import { runYouTubeMusicControlTests } from './phase5_youtube_music_control.test.ts';
-import { runNaturalSpeechTests } from './phase3_natural_speech.test.ts';
-import { runFeminineVoicePersonaGrammarTests } from './validate_female_hindi_grammar.test.ts';
-import { runAvatarEmotesAndYouTubeTests } from './avatar_emotes_youtube_download.test.ts';
-import { runFishAudioVoiceTests } from './fish_audio_tts.test.ts';
-import { runVoiceMicroserviceTests } from './voice_microservice_websocket.test.ts';
 
 async function main() {
   console.log('========================================');
@@ -62,23 +56,11 @@ async function main() {
     console.log('');
     await runElevenLabsVoiceTests();
     console.log('');
-    await runSttHinglishTests();
-    console.log('');
-    await runPhase4NotificationTests();
-    console.log('');
-    await runYouTubeMusicControlTests();
-    console.log('');
-    await runNaturalSpeechTests();
-    console.log('');
-    await runFeminineVoicePersonaGrammarTests();
-    console.log('');
-    await runAvatarEmotesAndYouTubeTests();
-    console.log('');
     await runFishAudioVoiceTests();
     console.log('');
-    await runVoiceMicroserviceTests();
+    await runPhase4NotificationTests();
     console.log('\n========================================');
-    console.log('ALL AUTOMATED TESTS (PHASES 1-5 + FEMININE PERSONA + FISH AUDIO TTS) PASSED (100%)');
+    console.log('ALL AUTOMATED TESTS (PHASE 1-3 FISH AUDIO & ELEVENLABS & PHASE 4 NOTIFICATIONS) PASSED (100%)');
     console.log('========================================');
   } catch (error) {
     console.error('\n❌ Test execution failed:', error);

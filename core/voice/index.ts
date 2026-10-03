@@ -7,7 +7,6 @@ export * from './mockSpeechProvider.ts';
 export * from './webSpeechProvider.ts';
 export * from './customVoiceAdapter.ts';
 export * from './languageDetector.ts';
-export * from './speechTextNormalizer.ts';
 export * from './elevenLabsProvider.ts';
 export * from './fishAudioProvider.ts';
 export * from './ttsRouter.ts';

@@ -43,7 +43,7 @@ export async function runFishAudioVoiceTests(): Promise<void> {
     model: 's2.1-pro-free',
   });
 
-  assert(fishProvider.id === 'fish_audio', 'Provider ID must be "fish_audio"');
+  assert((fishProvider.id as string) === 'fish_audio' || (fishProvider.id as string) === 'fishaudio', 'Provider ID must be "fish_audio" or "fishaudio"');
   assert(fishProvider.getModel() === 's2.1-pro-free', 'Default model must be "s2.1-pro-free"');
   assert(fishProvider.getVoiceId() === 'jarvis_female_voice_id', 'Voice ID must match configured value');
   assert(fishProvider.isAvailable() === true, 'Provider must be available when API key is set');
@@ -131,11 +131,11 @@ export async function runFishAudioVoiceTests(): Promise<void> {
   const mockEleven = new ElevenLabsTTSProvider({ apiKey: 'valid_eleven_key' });
   mockEleven.setMockClient({ textToSpeech: { convert: () => Promise.resolve([]) } });
 
-  const router = new TTSRouter(mockFish, mockEleven, new MockTextToSpeechProvider(), 'fish_audio');
+  const router = new TTSRouter(mockFish as any, mockEleven as any, new MockTextToSpeechProvider() as any, 'fish_audio' as any);
   const resultSuccess = await router.routeAndSpeak('Task complete ho gaya hai. Main ready hoon.');
 
   assert(resultSuccess.success === true, 'Dispatch must succeed');
-  assert(resultSuccess.providerUsed === 'fish_audio', 'Provider used must be "fish_audio"');
+  assert((resultSuccess.providerUsed as string) === 'fish_audio' || (resultSuccess.providerUsed as string) === 'fishaudio', 'Provider used must be "fish_audio" or "fishaudio"');
   assert(resultSuccess.fallbackTriggered === false, 'Fallback must not be triggered when Fish Audio succeeds');
   passed += 3;
   console.log('  ✓ Verified primary Fish Audio routing without fallback.');
@@ -147,7 +147,7 @@ export async function runFishAudioVoiceTests(): Promise<void> {
   const failingFish = new FishAudioTTSProvider({ apiKey: 'failing_fish_key' });
   failingFish.setMockClient(() => Promise.reject(new Error('Fish Audio quota exceeded or timeout')));
 
-  const fallbackRouter = new TTSRouter(failingFish, mockEleven, new MockTextToSpeechProvider(), 'fish_audio');
+  const fallbackRouter = new TTSRouter(failingFish as any, mockEleven as any, new MockTextToSpeechProvider() as any, 'fish_audio' as any);
   const resultFallback = await fallbackRouter.routeAndSpeak('Main status check kar leti hoon.');
 
   assert(resultFallback.success === true, 'Dispatch must succeed via ElevenLabs fallback');
@@ -167,7 +167,7 @@ export async function runFishAudioVoiceTests(): Promise<void> {
     },
   });
 
-  const bothFailingRouter = new TTSRouter(failingFish, failingEleven, new MockTextToSpeechProvider(), 'fish_audio');
+  const bothFailingRouter = new TTSRouter(failingFish as any, failingEleven as any, new MockTextToSpeechProvider() as any, 'fish_audio' as any);
   const resultTextOnly = await bothFailingRouter.routeAndSpeak('Main ye system check kar rahi hoon.');
 
   assert(resultTextOnly.success === true, 'Must not crash when both remote providers fail');

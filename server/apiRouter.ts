@@ -15,9 +15,7 @@ import { IntentDetector } from '../core/intent/intentDetector.ts';
 import { ProactivePolicy } from '../core/intent/proactivePolicy.ts';
 import { ProactiveEvent } from '../core/intent/types.ts';
 import { voiceEngine } from '../core/voice/voiceEngine.ts';
-import { SpeechTextNormalizer } from '../core/voice/speechTextNormalizer.ts';
 import { notificationEngine } from '../core/notifications/notificationEngine.ts';
-import { pythonVoiceBridge } from './pythonVoiceBridge.ts';
 
 export const apiRouter = express();
 
@@ -261,19 +259,27 @@ apiRouter.post('/api/proactive/evaluate', (req: Request, res: Response) => {
 // 10. Voice Engine Endpoints (Phase 3 Voice Engine & ElevenLabs TTS Router)
 apiRouter.get('/api/voice/status', async (_req: Request, res: Response) => {
   try {
-    const config = getConfig().voice;
+    const config = voiceEngine.getConfig();
     const state = voiceEngine.getState();
     const permissionState = voiceEngine.getPermissionState();
     const session = voiceEngine.getCurrentSession();
     const voices = await voiceEngine.getAvailableVoices();
     const ttsRouter = voiceEngine.getTTSRouter();
-    const isFishAudioConfigured = Boolean(process.env.FISH_API_KEY && process.env.FISH_API_KEY.trim());
-    const isElevenLabsConfigured = Boolean(process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_API_KEY.trim());
+    const hasElevenLabsKey = Boolean(process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_API_KEY.trim().length > 0 && !process.env.ELEVENLABS_API_KEY.includes('your_'));
+    const isElevenLabsConfigured = hasElevenLabsKey && !(ttsRouter as any)?.getElevenLabsProvider?.()?.getHasAuthError?.();
+    const hasFishAudioKey = Boolean(process.env.FISH_AUDIO_API_KEY && process.env.FISH_AUDIO_API_KEY.trim().length > 0 && !process.env.FISH_AUDIO_API_KEY.includes('your_'));
+    const isFishAudioConfigured = hasFishAudioKey && !(ttsRouter as any)?.getFishAudioProvider?.()?.getHasAuthError?.();
     const elSettings = (ttsRouter as any)?.getElevenLabsSettings?.() || {
       stability: 0.5,
       similarity_boost: 0.75,
       style: 0.65,
       pitch: 0.72,
+    };
+    const fishSettings = (ttsRouter as any)?.getFishAudioSettings?.() || {
+      model: config.fishaudio_model || 's2.1-pro',
+      reference_id: config.fishaudio_reference_id || (ttsRouter as any)?.getFishAudioProvider?.()?.getReferenceId?.() || '817eba7f1aea469f9802326568d427b9',
+      latency: config.fishaudio_latency || 'normal',
+      format: config.fishaudio_format || 'mp3',
     };
 
     res.json({
@@ -286,13 +292,21 @@ apiRouter.get('/api/voice/status', async (_req: Request, res: Response) => {
       speechRate: config.speech_rate,
       speechVolume: config.speech_volume,
       interruptSpeech: config.interrupt_speech,
-      ttsProvider: config.tts_provider || 'fish_audio',
-      fishAudioConfigured: isFishAudioConfigured, // Boolean only - FISH_API_KEY is NEVER exposed
-      fishModel: config.fish_model || 's2.1-pro-free',
-      fishVoiceId: config.fish_voice_id || '',
+      ttsProvider: 'fishaudio',
       elevenlabsModel: config.elevenlabs_model || 'eleven_multilingual_v2',
       elevenlabsConfigured: isElevenLabsConfigured, // Boolean only - ELEVENLABS_API_KEY is NEVER exposed
+      elevenlabsAuthError: Boolean((ttsRouter as any)?.getElevenLabsProvider?.()?.getHasAuthError?.()),
       elevenlabsSettings: elSettings,
+      fishaudioConfigured: isFishAudioConfigured, // Boolean only - FISH_AUDIO_API_KEY is NEVER exposed
+      fishaudioKeyConfigured: hasFishAudioKey,
+      fishaudioKeyMasked: hasFishAudioKey ? 'sk-fish-••••••••••••' : '',
+      fishaudioAuthError: Boolean((ttsRouter as any)?.getFishAudioProvider?.()?.getHasAuthError?.()),
+      fishaudioCreditError: Boolean((ttsRouter as any)?.getFishAudioProvider?.()?.getHasCreditError?.()),
+      fishaudioModel: config.fishaudio_model || 's2.1-pro',
+      fishaudioReferenceId: config.fishaudio_reference_id || (ttsRouter as any)?.getFishAudioProvider?.()?.getReferenceId?.() || '817eba7f1aea469f9802326568d427b9',
+      fishaudioLatency: config.fishaudio_latency || 'normal',
+      fishaudioFormat: config.fishaudio_format || 'mp3',
+      fishaudioSettings: fishSettings,
       stability: elSettings.stability,
       style: elSettings.style,
       similarityBoost: elSettings.similarity_boost,
@@ -309,6 +323,7 @@ apiRouter.get('/api/voice/status', async (_req: Request, res: Response) => {
 apiRouter.post('/api/voice/config', (req: Request, res: Response) => {
   try {
     const updated = voiceEngine.updateVoiceConfig(req.body);
+    updateConfig({ voice: { ...getConfig().voice, ...req.body } });
     const ttsRouter = voiceEngine.getTTSRouter();
     if (ttsRouter) {
       if (req.body.tts_provider) ttsRouter.setProvider(req.body.tts_provider);
@@ -327,14 +342,220 @@ apiRouter.post('/api/voice/config', (req: Request, res: Response) => {
       if (req.body.pitch !== undefined && (ttsRouter as any).setPitch) {
         (ttsRouter as any).setPitch(Number(req.body.pitch));
       }
+      // Fish Audio parameters
+      const fishProvider = (ttsRouter as any).getFishAudioProvider?.();
+      if (fishProvider) {
+        if (req.body.fishaudio_api_key !== undefined) {
+          const rawKey = String(req.body.fishaudio_api_key || '').trim();
+          if (rawKey) {
+            fishProvider.setApiKey(rawKey);
+            process.env.FISH_AUDIO_API_KEY = rawKey;
+          }
+        }
+        if (req.body.fishaudio_model) fishProvider.setModel(req.body.fishaudio_model);
+        if (req.body.fishaudio_reference_id) {
+          fishProvider.setReferenceId(req.body.fishaudio_reference_id);
+          process.env.FISH_AUDIO_REFERENCE_ID = req.body.fishaudio_reference_id;
+        }
+        if (req.body.fishaudio_latency) fishProvider.setLatency(req.body.fishaudio_latency);
+        if (req.body.fishaudio_format) fishProvider.setFormat(req.body.fishaudio_format);
+      }
     }
-    logger.info('VoiceAPI', 'Voice configuration updated with ElevenLabs parameters.');
+    logger.info('VoiceAPI', 'Voice configuration updated with Fish Audio parameters.');
     res.json({
       ...updated,
       elevenlabsSettings: (ttsRouter as any)?.getElevenLabsSettings?.() || null,
+      fishaudioSettings: (ttsRouter as any)?.getFishAudioSettings?.() || null,
+      fishaudioConfigured: Boolean((ttsRouter as any)?.getFishAudioProvider?.()?.isAvailable?.()),
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Dedicated Fish Audio Connection & Key Verification Endpoint
+apiRouter.post('/api/voice/verify-fishaudio', async (req: Request, res: Response) => {
+  try {
+    const ttsRouter = voiceEngine.getTTSRouter();
+    const fishProvider = (ttsRouter as any)?.getFishAudioProvider?.();
+    const keyToTest = req.body.apiKey ? String(req.body.apiKey).trim() : (fishProvider?.getCleanApiKey?.() || process.env.FISH_AUDIO_API_KEY || '').trim();
+    const refToTest = req.body.referenceId ? String(req.body.referenceId).trim() : (fishProvider?.getReferenceId?.() || '817eba7f1aea469f9802326568d427b9');
+
+    if (!keyToTest) {
+      res.json({
+        success: false,
+        verified: false,
+        error: 'No Fish Audio API key provided or configured.',
+      });
+      return;
+    }
+
+    // Clean key if combined
+    let cleanKey = keyToTest;
+    if (cleanKey.includes(' ')) {
+      const parts = cleanKey.split(/\s+/);
+      cleanKey = parts.find((p: string) => p.startsWith('sk-') || p.length > 40) || parts[0];
+    }
+
+    const testRes = await fetch('https://api.fish.audio/v1/tts', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${cleanKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: 'Voice matrix verification ping.',
+        reference_id: refToTest,
+      }),
+    });
+
+    if (testRes.status === 200) {
+      if (req.body.apiKey && fishProvider) {
+        fishProvider.setApiKey(cleanKey);
+        process.env.FISH_AUDIO_API_KEY = cleanKey;
+      }
+      res.json({
+        success: true,
+        verified: true,
+        authValid: true,
+        creditAvailable: true,
+        status: 200,
+        message: 'Fish Audio API key verified and operational. Cloud neural streaming is active.',
+      });
+      return;
+    }
+
+    if (testRes.status === 402) {
+      if (req.body.apiKey && fishProvider) {
+        fishProvider.setApiKey(cleanKey);
+        process.env.FISH_AUDIO_API_KEY = cleanKey;
+      }
+      res.json({
+        success: true,
+        verified: true,
+        authValid: true,
+        creditAvailable: false,
+        status: 402,
+        message: 'Fish Audio API key is authenticated. Account credit balance is 0.00 (402). Local Jarvis Hindi voice synthesis is operating seamlessly.',
+      });
+      return;
+    }
+
+    if (testRes.status === 401 || testRes.status === 403) {
+      res.json({
+        success: false,
+        verified: false,
+        authValid: false,
+        status: testRes.status,
+        error: 'Invalid API token (401 Unauthorized). Please check your fish.audio API key.',
+      });
+      return;
+    }
+
+    const errText = await testRes.text().catch(() => '');
+    res.json({
+      success: false,
+      verified: false,
+      status: testRes.status,
+      error: `Fish Audio responded with status ${testRes.status}: ${errText.slice(0, 120)}`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'Verification connection failed' });
+  }
+});
+
+// Dedicated TTS Audio Synthesis Endpoint (Fish Audio & ElevenLabs Direct Output)
+apiRouter.post('/api/voice/synthesize', async (req: Request, res: Response) => {
+  try {
+    const { text, provider, voice_id, reference_id, model, latency, format, rate, volume } = req.body;
+    if (!text || typeof text !== 'string') {
+      res.status(400).json({ error: 'Text is required for TTS synthesis.' });
+      return;
+    }
+
+    const ttsRouter = voiceEngine.getTTSRouter();
+    const effectiveProvider = (provider === 'system' || provider === 'local') ? provider : 'fishaudio';
+
+    if (effectiveProvider === 'fishaudio') {
+      const fishProvider = ttsRouter?.getFishAudioProvider();
+      if (!fishProvider || !fishProvider.isAvailable()) {
+        const isAuthError = Boolean(fishProvider?.getHasAuthError());
+        const isCreditError = Boolean(fishProvider?.getHasCreditError());
+        res.json({
+          success: true,
+          provider: 'local',
+          fallbackTriggered: true,
+          creditExhausted: isCreditError,
+          fallbackReason: isCreditError
+            ? 'Fish Audio API credit is exhausted (402). Operating seamlessly with Jarvis Hindi voice synthesis.'
+            : isAuthError
+            ? 'Fish Audio token is invalid (401). Operating seamlessly with Jarvis Hindi voice synthesis.'
+            : 'Fish Audio is operating via Jarvis Hindi voice synthesis.',
+          text,
+        });
+        return;
+      }
+
+      try {
+        const result = await fishProvider.synthesize(text, {
+          referenceId: reference_id || voice_id,
+          model,
+          latency,
+          rate: rate ? Number(rate) : undefined,
+          volume: volume ? Number(volume) : undefined,
+        });
+
+        res.json({
+          success: true,
+          provider: 'fishaudio',
+          text: result.text,
+          model: result.model,
+          referenceId: result.referenceId,
+          format: result.format,
+          audioBase64: result.audioBase64,
+          contentType: result.format === 'wav' ? 'audio/wav' : 'audio/mpeg',
+        });
+        return;
+      } catch (fishErr: any) {
+        logger.warn(
+          'VoiceAPI',
+          `Fish Audio synthesis unavailable (${fishErr.message}). Graceful local fallback active.`
+        );
+
+        res.json({
+          success: true,
+          provider: 'local',
+          fallbackTriggered: true,
+          creditExhausted: Boolean(fishProvider?.getHasCreditError()),
+          fallbackReason: fishErr.message || 'Fish Audio cloud synthesis error',
+          text,
+        });
+        return;
+      }
+    }
+
+    // Default speak fallback
+    const result = await voiceEngine.speak(text, {
+      voiceId: voice_id || reference_id,
+      rate,
+      volume,
+    });
+
+    res.json({
+      success: true,
+      provider: effectiveProvider,
+      text,
+      spoken: result.text,
+    });
+  } catch (err: any) {
+    logger.warn('VoiceAPI', `Synthesis request handled with local fallback: ${err.message}`);
+    res.json({
+      success: true,
+      provider: 'local',
+      fallbackTriggered: true,
+      fallbackReason: err.message,
+      text: req.body?.text || '',
+    });
   }
 });
 
@@ -379,7 +600,6 @@ apiRouter.post('/api/voice/speak', async (req: Request, res: Response) => {
     res.json({
       ...result,
       dispatch: lastDispatch || null,
-      debug: voiceEngine.getNormalizationDebug(),
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -390,29 +610,6 @@ apiRouter.post('/api/voice/stop', (_req: Request, res: Response) => {
   voiceEngine.stopSpeaking();
   voiceEngine.stopListening();
   res.json({ success: true, state: voiceEngine.getState() });
-});
-
-// 10b. Speech Text Normalization Preview & Testing Endpoint
-apiRouter.post(['/api/voice/normalize', '/api/voice/preview'], (req: Request, res: Response) => {
-  try {
-    const { text, userPrompt, userPromptLanguage, targetLanguageMode } = req.body;
-    if (!text || typeof text !== 'string') {
-      res.status(400).json({ error: 'Text field is required for normalization.' });
-      return;
-    }
-    const result = SpeechTextNormalizer.normalize(text, {
-      userPrompt,
-      userPromptLanguage,
-      targetLanguageMode,
-    });
-    res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-apiRouter.get('/api/voice/debug', (_req: Request, res: Response) => {
-  res.json(voiceEngine.getNormalizationDebug());
 });
 
 // ==========================================
@@ -450,73 +647,6 @@ apiRouter.post('/api/notifications/config', (req: Request, res: Response) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-// ==========================================
-// Python Voice Microservice Endpoints
-// ==========================================
-
-apiRouter.get('/api/voice/microservice/status', (_req: Request, res: Response) => {
-  res.json({
-    status: 'online',
-    isReady: pythonVoiceBridge.isServiceReady(),
-    service: 'python_voice_microservice',
-    engine: 'AcousticCyberneticSynthesizer',
-    sampleRate: 24000,
-    features: [
-      'multilingual_phonetic_normalization',
-      'feminine_grammar_calibration',
-      'devanagari_romanization',
-      'acronym_prosody_expansion',
-      'currency_numbers_units_formatting',
-      'formant_vowel_synthesis',
-      'consonant_fricatives_and_plosives',
-      'sub_bass_55hz_resonance',
-      'realtime_chunked_streaming',
-      'websocket_ipc_pipeline',
-    ],
-  });
-});
-
-apiRouter.post('/api/voice/microservice/process', async (req: Request, res: Response) => {
-  try {
-    const { text, options } = req.body;
-    if (!text || typeof text !== 'string') {
-      res.status(400).json({ error: 'Text field is required' });
-      return;
-    }
-    const result = await pythonVoiceBridge.processText(text, options);
-    res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-apiRouter.post('/api/voice/microservice/synthesize', async (req: Request, res: Response) => {
-  try {
-    const { text, options } = req.body;
-    if (!text || typeof text !== 'string') {
-      res.status(400).json({ error: 'Text field is required' });
-      return;
-    }
-    const chunks: Buffer[] = [];
-    await pythonVoiceBridge.synthesizeStream(text, options, (evt) => {
-      if (evt.event === 'chunk' && evt.audio_base64) {
-        chunks.push(Buffer.from(evt.audio_base64, 'base64'));
-      }
-    });
-
-    if (chunks.length > 0) {
-      const combined = Buffer.concat(chunks);
-      res.setHeader('Content-Type', 'audio/wav');
-      res.send(combined);
-    } else {
-      res.status(500).json({ error: 'No audio generated' });
-    }
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 
 
 

@@ -12,7 +12,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Settings, User, Minus, Square, X } from 'lucide-react';
+import { Settings, User, Minus, Square, X, Volume2, VolumeX, ShieldCheck } from 'lucide-react';
 import { soundFx } from '../../utils/audioEffects.ts';
 
 interface JarvisTopBarProps {
@@ -28,6 +28,15 @@ export const JarvisTopBar: React.FC<JarvisTopBarProps> = ({
 }) => {
   const [timeStr, setTimeStr] = useState('14:28');
   const [dateStr, setDateStr] = useState('Sat, 17 May 2025');
+  const [extraSoundOn, setExtraSoundOn] = useState<boolean>(() => soundFx.isExtraSoundEnabled());
+
+  useEffect(() => {
+    const handleSoundChange = (e: any) => {
+      setExtraSoundOn(Boolean(e.detail?.enabled));
+    };
+    window.addEventListener('jarvis_extra_sound_changed', handleSoundChange);
+    return () => window.removeEventListener('jarvis_extra_sound_changed', handleSoundChange);
+  }, []);
 
   useEffect(() => {
     const updateTime = () => {
@@ -108,7 +117,37 @@ export const JarvisTopBar: React.FC<JarvisTopBarProps> = ({
       </div>
 
       {/* RIGHT: Status Badge, Settings, Profile, Window Controls */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5">
+        {/* Clear Voice / Extra Sound Status Pill & Toggle */}
+        <button
+          onClick={() => {
+            const next = soundFx.toggleExtraSound();
+            setExtraSoundOn(next);
+          }}
+          title={
+            extraSoundOn
+              ? 'Extra Sound FX Enabled. Click to Mute Extra Sounds for Pure Clear Voice.'
+              : 'Clear Voice Active: All Extra Sounds Muted (Pure Vocal Audio).'
+          }
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[11px] font-sans font-medium transition-all cursor-pointer ${
+            !extraSoundOn
+              ? 'bg-cyan-950/40 border-cyan-500/50 text-cyan-300 shadow-[0_0_12px_rgba(6,182,212,0.25)] hover:border-cyan-400'
+              : 'bg-amber-950/40 border-amber-500/50 text-amber-300 hover:border-amber-400'
+          }`}
+        >
+          {!extraSoundOn ? (
+            <>
+              <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Clear Voice (No Extra Sound)</span>
+            </>
+          ) : (
+            <>
+              <VolumeX className="w-3.5 h-3.5 text-amber-400" />
+              <span>Extra FX: On</span>
+            </>
+          )}
+        </button>
+
         {/* Online / Offline Status Badge */}
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/40 border border-emerald-500/40 shadow-[0_0_14px_rgba(16,185,129,0.25)]">
           <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse' : 'bg-zinc-500'}`} />

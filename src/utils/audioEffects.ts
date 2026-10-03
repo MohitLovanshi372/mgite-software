@@ -7,8 +7,38 @@ import { AIStateMode } from '../types/index.ts';
 
 class SoundSynthesizer {
   private ctx: AudioContext | null = null;
+  private extraSoundEnabled: boolean = false; // Default FALSE: "Clear voice not extra sound"
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('jarvis_extra_sound_effects');
+      // Default to false (muted extra sound) to guarantee pure, clear voice output
+      this.extraSoundEnabled = saved === 'true';
+    }
+  }
+
+  public isExtraSoundEnabled(): boolean {
+    return this.extraSoundEnabled;
+  }
+
+  public setExtraSoundEnabled(enabled: boolean) {
+    this.extraSoundEnabled = enabled;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('jarvis_extra_sound_effects', String(enabled));
+      window.dispatchEvent(
+        new CustomEvent('jarvis_extra_sound_changed', { detail: { enabled } })
+      );
+    }
+  }
+
+  public toggleExtraSound(): boolean {
+    const next = !this.extraSoundEnabled;
+    this.setExtraSoundEnabled(next);
+    return next;
+  }
 
   private getContext(): AudioContext | null {
+    if (!this.extraSoundEnabled) return null;
     if (typeof window === 'undefined') return null;
     if (!this.ctx) {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -23,6 +53,7 @@ class SoundSynthesizer {
   }
 
   public playStateSound(state: AIStateMode) {
+    if (!this.extraSoundEnabled) return;
     const ctx = this.getContext();
     if (!ctx) return;
 

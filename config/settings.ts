@@ -44,8 +44,10 @@ export interface AppConfig {
     stt_provider: string;
     tts_provider: string;
     elevenlabs_model?: string;
-    fish_model?: string;
-    fish_voice_id?: string;
+    fishaudio_model?: string;
+    fishaudio_reference_id?: string;
+    fishaudio_latency?: string;
+    fishaudio_format?: string;
   };
   notification: {
     enabled: boolean;
@@ -95,15 +97,16 @@ let activeConfig: AppConfig = {
       ? process.env.AUTO_SPEAK === 'true'
       : (defaultConfig as any).voice?.auto_speak ?? false,
     preferred_language: process.env.VOICE_LANGUAGE || (defaultConfig as any).voice?.preferred_language || 'auto',
-    voice_id: process.env.ELEVENLABS_VOICE_ID || (defaultConfig as any).voice?.voice_id || '21m00Tcm4TlvDq8ikWAM',
+    voice_id: process.env.FISH_AUDIO_REFERENCE_ID || (defaultConfig as any).voice?.fishaudio_reference_id || '817eba7f1aea469f9802326568d427b9',
     speech_rate: (defaultConfig as any).voice?.speech_rate ?? 1.0,
     speech_volume: (defaultConfig as any).voice?.speech_volume ?? 1.0,
     interrupt_speech: (defaultConfig as any).voice?.interrupt_speech ?? true,
     stt_provider: (defaultConfig as any).voice?.stt_provider || 'system',
-    tts_provider: process.env.TTS_PROVIDER || (defaultConfig as any).voice?.tts_provider || 'fish_audio',
-    elevenlabs_model: process.env.ELEVENLABS_MODEL || (defaultConfig as any).voice?.elevenlabs_model || 'eleven_multilingual_v2',
-    fish_model: process.env.FISH_MODEL || (defaultConfig as any).voice?.fish_model || 's2.1-pro-free',
-    fish_voice_id: process.env.FISH_VOICE_ID || (defaultConfig as any).voice?.fish_voice_id || '',
+    tts_provider: 'fishaudio',
+    fishaudio_model: process.env.FISH_AUDIO_MODEL || (defaultConfig as any).voice?.fishaudio_model || 's2.1-pro',
+    fishaudio_reference_id: process.env.FISH_AUDIO_REFERENCE_ID || (defaultConfig as any).voice?.fishaudio_reference_id || '817eba7f1aea469f9802326568d427b9',
+    fishaudio_latency: process.env.FISH_AUDIO_LATENCY || (defaultConfig as any).voice?.fishaudio_latency || 'normal',
+    fishaudio_format: (defaultConfig as any).voice?.fishaudio_format || 'mp3',
   },
   notification: {
     enabled: process.env.NOTIFICATION_INTELLIGENCE_ENABLED !== undefined

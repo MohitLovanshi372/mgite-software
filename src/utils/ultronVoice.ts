@@ -51,16 +51,16 @@ class UltronVoiceEngine {
   private subBassOsc: OscillatorNode | null = null;
   private subBassGain: GainNode | null = null;
 
-  // Vocal Parameters
-  private volume: number = 0.9;
+  // Vocal Parameters - High Clarity Clear Voice Persona
+  private volume: number = 1.0;
   private isMuted: boolean = false;
-  private pitch: number = 1.0; // Default natural pitch for female persona (0.80 - 1.30)
-  private rate: number = 0.96;  // Natural conversational cadence
-  private stability: number = 0.65; // Stability (0.0 - 1.0)
-  private style: number = 0.50;     // Style exaggeration (0.0 - 1.0)
-  private similarityBoost: number = 0.80; // Similarity boost (0.0 - 1.0)
-  private activeProfile: string = 'JARVIS_FEMALE';
-  private clearVoiceMode: boolean = true; // High-clarity mode: eliminates sub-bass drone and clicks
+  private pitch: number = 1.0; // Natural human pitch (1.0 = clear, crisp articulation)
+  private rate: number = 0.98;  // Natural conversational cadence
+  private stability: number = 0.90; // High stability: zero pitch wobble or distortion
+  private style: number = 0.0;     // Zero artificial distortion
+  private similarityBoost: number = 0.95;
+  private activeProfile: string = 'JARVIS_CLEAR';
+  private clearVoiceMode: boolean = true; // High-clarity mode: zero sub-bass drone, zero clicks
 
   // Multilingual & Pronunciation Configuration
   private languageMode: LanguageMode = 'AUTO';
@@ -488,89 +488,20 @@ class UltronVoiceEngine {
 
   /**
    * Generates Ultron's metallic acoustic shutter click
+   * In Clear Voice Mode, permanently returns immediately to prevent any extra click sound.
    */
-  private playVocalClick(type: 'OPEN' | 'CLOSE') {
-    // In clear voice mode or female JARVIS persona, do not play robotic clicks
-    if (this.clearVoiceMode || this.activeProfile !== 'ULTRON_PRIME') return;
-
-    const ctx = this.getAudioContext();
-    if (!ctx) return;
-    try {
-      const now = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const filter = ctx.createBiquadFilter();
-
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(type === 'OPEN' ? 1800 : 1200, now);
-      filter.Q.setValueAtTime(3.5, now);
-
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(type === 'OPEN' ? 240 : 180, now);
-      osc.frequency.exponentialRampToValueAtTime(80, now + 0.05);
-
-      gain.gain.setValueAtTime(0.08 * this.volume, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
-
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start(now);
-      osc.stop(now + 0.06);
-    } catch (_) {}
+  private playVocalClick(_type: 'OPEN' | 'CLOSE') {
+    // Pure Clear Voice Mode: all mechanical clicks and shutter sounds are eliminated
+    return;
   }
 
   /**
    * Starts ambient sub-bass servo resonance drone
-   * When speaking Hindi or Hinglish, sub-bass is moderated to guarantee vocal clarity and eliminate distortion.
+   * In Clear Voice Mode, permanently returns immediately to eliminate background hum/drone.
    */
-  private startSubBassResonance(isHindiOrHinglish: boolean = false) {
-    // In clear voice mode or female JARVIS persona, do not play low-end drone
-    if (this.clearVoiceMode || this.activeProfile !== 'ULTRON_PRIME') return;
-
-    const ctx = this.getAudioContext();
-    if (!ctx) return;
-    try {
-      this.stopSubBassResonance();
-      const now = ctx.currentTime;
-
-      // Sub-bass carrier frequency
-      const baseFreq = 50 + (this.pitch * 32);
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const lfo = ctx.createOscillator();
-      const lfoGain = ctx.createGain();
-
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(baseFreq, now);
-
-      // In Hindi/Hinglish mode, keep sub-bass very subtle (0.015) so matras are crystal clear
-      const maxSubGain = isHindiOrHinglish ? 0.015 * this.volume : (0.05 + (this.similarityBoost * 0.03)) * this.volume;
-
-      const stabilityDrift = (1 - this.stability) * 3;
-      if (stabilityDrift > 0.5) {
-        osc.frequency.linearRampToValueAtTime(baseFreq + stabilityDrift, now + 0.4);
-      }
-
-      const flutterFreq = 10 + (this.style * 8);
-      lfo.type = 'sine';
-      lfo.frequency.setValueAtTime(flutterFreq, now);
-      lfoGain.gain.setValueAtTime((0.01 + (this.style * 0.015)) * this.volume, now);
-
-      lfo.connect(gain.gain);
-      lfo.start(now);
-
-      gain.gain.setValueAtTime(0.001, now);
-      gain.gain.linearRampToValueAtTime(maxSubGain, now + 0.15);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-
-      this.subBassOsc = osc;
-      this.subBassGain = gain;
-    } catch (_) {}
+  private startSubBassResonance(_isHindiOrHinglish: boolean = false) {
+    // Pure Clear Voice Mode: sub-bass carrier waves and background drone are permanently eliminated
+    return;
   }
 
   /**
@@ -682,9 +613,51 @@ class UltronVoiceEngine {
   }
 
   /**
-   * Speaks text with correct pronunciation in Hindi, Hinglish, or English.
-   * Streams audio data via WebSocket from Python microservice when connected,
-   * with seamless fallback to browser Web Speech API.
+   * Synthesize speech via Fish Audio API backend endpoint with Jarvis voice
+   */
+  public async speakViaFishAudio(text: string, options?: VoiceSpeakOptions): Promise<boolean> {
+    if (typeof window === 'undefined') return false;
+    try {
+      const res = await fetch('/api/voice/synthesize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text,
+          provider: 'fishaudio',
+          reference_id: '817eba7f1aea469f9802326568d427b9',
+          model: 's2.1-pro',
+          rate: options?.rate ?? this.rate,
+          volume: options?.volume ?? this.volume,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.audioBase64) {
+          const audioUri = `data:${data.contentType || 'audio/mpeg'};base64,${data.audioBase64}`;
+          const audio = new Audio(audioUri);
+          audio.volume = options?.volume ?? this.volume;
+          this.isSpeaking = true;
+          if (options?.onStart) options.onStart();
+          audio.onended = () => {
+            this.isSpeaking = false;
+            if (options?.onEnd) options.onEnd();
+          };
+          audio.onerror = () => {
+            this.isSpeaking = false;
+            this.speakViaWebSpeech(text, options);
+          };
+          await audio.play();
+          return true;
+        }
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  /**
+   * Speaks text using Fish Audio API (Jarvis Hindi Model), with seamless
+   * local speech synthesis fallback.
    */
   public speak(
     text: string,
@@ -698,17 +671,17 @@ class UltronVoiceEngine {
       return;
     }
 
-    // Try WebSocket streaming from Python microservice first if connected
-    if (this.isWsConnected && this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.streamSpeechViaWebSocket(text, options).catch((err) => {
-        console.warn('[UltronVoice] WebSocket streaming failed, using fallback Web Speech API:', err.message);
+    // Attempt Fish Audio TTS API first
+    this.speakViaFishAudio(text, options)
+      .then((played) => {
+        if (!played) {
+          // Fallback to local Jarvis Hindi / Indian speech synthesis
+          this.speakViaWebSpeech(text, options);
+        }
+      })
+      .catch(() => {
         this.speakViaWebSpeech(text, options);
       });
-      return;
-    }
-
-    // Fallback to local browser speech synthesis
-    this.speakViaWebSpeech(text, options);
   }
 
   /**
@@ -775,11 +748,11 @@ class UltronVoiceEngine {
     utterance.lang = options?.lang || pronunciation.recommendedLocale;
 
     if (pronunciation.isHindi) {
-      utterance.pitch = options?.pitch !== undefined ? options.pitch : Math.max(0.85, this.pitch);
-      utterance.rate = options?.rate !== undefined ? options.rate : 0.94;
+      utterance.pitch = options?.pitch !== undefined ? options.pitch : 1.0;
+      utterance.rate = options?.rate !== undefined ? options.rate : 0.98;
     } else if (pronunciation.isHinglish) {
-      utterance.pitch = options?.pitch !== undefined ? options.pitch : Math.max(0.82, this.pitch);
-      utterance.rate = options?.rate !== undefined ? options.rate : 0.92;
+      utterance.pitch = options?.pitch !== undefined ? options.pitch : 1.0;
+      utterance.rate = options?.rate !== undefined ? options.rate : 0.98;
     } else {
       utterance.pitch = options?.pitch !== undefined ? options.pitch : this.pitch;
       utterance.rate = options?.rate !== undefined ? options.rate : this.rate;
@@ -905,9 +878,23 @@ class UltronVoiceEngine {
     this.similarityBoost = Math.max(0.0, Math.min(1.0, val));
   }
 
+  public isClearVoiceMode(): boolean {
+    return this.clearVoiceMode;
+  }
+
   public applyProfile(profileName: string) {
     this.activeProfile = profileName;
     switch (profileName) {
+      case 'JARVIS_CLEAR':
+      case 'JARVIS_FEMALE':
+      case 'CLEAR_VOICE':
+        this.pitch = 1.0;
+        this.stability = 0.90;
+        this.style = 0.0;
+        this.similarityBoost = 0.95;
+        this.rate = 0.98;
+        this.clearVoiceMode = true;
+        break;
       case 'ULTRON_PRIME':
         this.pitch = 0.72;
         this.stability = 0.45;

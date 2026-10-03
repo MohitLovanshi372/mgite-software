@@ -40,7 +40,7 @@ export interface VoiceConfiguration {
   interruptSpeech?: boolean;
   stt_provider: string;
   sttProvider?: string;
-  tts_provider: string; // 'elevenlabs' | 'system' | 'local' | 'mock'
+  tts_provider: string; // 'fishaudio' | 'elevenlabs' | 'system' | 'local' | 'mock'
   ttsProvider?: string;
   elevenlabs_voice_id?: string;
   elevenlabsVoiceId?: string;
@@ -54,6 +54,14 @@ export interface VoiceConfiguration {
   elevenlabsStyle?: number;
   elevenlabs_pitch?: number;
   elevenlabsPitch?: number;
+  fishaudio_model?: string;
+  fishaudioModel?: string;
+  fishaudio_reference_id?: string;
+  fishaudioReferenceId?: string;
+  fishaudio_latency?: 'normal' | 'balanced' | string;
+  fishaudioLatency?: 'normal' | 'balanced' | string;
+  fishaudio_format?: 'mp3' | 'wav' | 'pcm' | 'opus' | string;
+  fishaudioFormat?: 'mp3' | 'wav' | 'pcm' | 'opus' | string;
 }
 
 export type VoiceConfig = VoiceConfiguration;
