@@ -96,17 +96,17 @@ export const ChatView: React.FC<ChatViewProps> = ({
   };
 
   return (
-    <div className="w-full h-full flex flex-col p-4 gap-3 bg-[#060b18]/60 backdrop-blur-md rounded-2xl border border-blue-500/20 shadow-[inset_0_0_40px_rgba(0,100,255,0.06)] overflow-hidden">
+    <div className="w-full h-full flex flex-col p-4 gap-3 bg-[#030712]/80 backdrop-blur-md rounded-2xl border border-[#D4AF37]/20 shadow-[0_0_20px_rgba(212,175,55,0.04)] overflow-hidden">
       {/* Chat Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-blue-900/40">
+      <div className="flex items-center justify-between pb-3 border-b border-[#D4AF37]/15">
         <div className="flex items-center gap-2.5">
-          <Bot className="w-5 h-5 text-cyan-400" />
-          <span className="text-sm font-sans font-bold text-white tracking-wide">
-            JARVIS NEURAL DIALOGUE
+          <Bot className="w-5 h-5 text-[#FFD76A]" />
+          <span className="text-sm font-sans font-bold text-[#E8EAF0] tracking-wide">
+            JARVIS DIALOGUE STREAM
           </span>
         </div>
-        <span className="text-xs font-mono text-cyan-400 bg-cyan-950/40 border border-cyan-500/30 px-2.5 py-0.5 rounded-full">
-          ELEVENLABS TTS SYNCHRONIZED
+        <span className="text-xs font-mono text-[#FFD76A] bg-[#D4AF37]/10 border border-[#D4AF37]/30 px-2.5 py-0.5 rounded-full">
+          FISH AUDIO & GEMINI SYNCHRONIZED
         </span>
       </div>
 
@@ -122,15 +122,15 @@ export const ChatView: React.FC<ChatViewProps> = ({
             <div
               className={`p-3.5 rounded-2xl text-sm font-sans leading-relaxed ${
                 msg.sender === 'user'
-                  ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-tr-none shadow-[0_0_15px_rgba(0,140,255,0.3)]'
-                  : 'bg-[#091428]/90 text-slate-100 border border-blue-500/25 rounded-tl-none shadow-[0_0_15px_rgba(0,140,255,0.05)]'
+                  ? 'bg-gradient-to-r from-[#D4AF37] to-[#FFD76A] text-[#030712] font-medium rounded-tr-none shadow-[0_0_15px_rgba(212,175,55,0.3)]'
+                  : 'bg-[#060D1E]/90 text-slate-100 border border-[#D4AF37]/25 rounded-tl-none shadow-[0_0_15px_rgba(212,175,55,0.05)]'
               }`}
             >
               <p>{msg.text}</p>
 
               {/* Show Normalized Text inspection tag for JARVIS messages */}
               {msg.sender === 'jarvis' && msg.normalizedText && msg.normalizedText !== msg.text && (
-                <div className="mt-2 pt-2 border-t border-blue-900/40 text-[11px] text-cyan-300 font-mono">
+                <div className="mt-2 pt-2 border-t border-[#D4AF37]/20 text-[11px] text-[#FFD76A] font-mono">
                   <span className="text-slate-400">TTS Spoken: </span>
                   {msg.normalizedText}
                 </div>
@@ -143,9 +143,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 <button
                   onClick={() => handleSpeak(msg.text)}
                   title="Replay Voice Speech"
-                  className="hover:text-cyan-400 transition-colors cursor-pointer flex items-center gap-1"
+                  className="hover:text-[#FFD76A] transition-colors cursor-pointer flex items-center gap-1"
                 >
-                  <Volume2 className="w-3 h-3" />
+                  <Volume2 className="w-3 h-3 text-[#D4AF37]" />
                   <span>Replay</span>
                 </button>
               )}
@@ -156,18 +156,18 @@ export const ChatView: React.FC<ChatViewProps> = ({
       </div>
 
       {/* Chat Input */}
-      <form onSubmit={handleSend} className="flex items-center gap-2 pt-2 border-t border-blue-900/30">
+      <form onSubmit={handleSend} className="flex items-center gap-2 pt-2 border-t border-[#D4AF37]/15">
         <input
           type="text"
           value={inputVal}
           onChange={(e) => setInputVal(e.target.value)}
           placeholder="Type message to JARVIS..."
-          className="flex-1 bg-[#091122]/90 border border-blue-500/30 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-400 focus:shadow-[0_0_15px_rgba(6,182,212,0.3)]"
+          className="flex-1 bg-[#030712]/90 border border-[#D4AF37]/25 rounded-xl px-4 py-2.5 text-sm text-[#E8EAF0] placeholder:text-slate-500 focus:outline-none focus:border-[#FFD76A] focus:shadow-[0_0_15px_rgba(255,215,106,0.2)]"
         />
         <button
           type="submit"
           disabled={!inputVal.trim()}
-          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-medium text-sm flex items-center gap-1.5 shadow-[0_0_12px_rgba(0,140,255,0.4)] disabled:opacity-50 cursor-pointer"
+          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#FFD76A] text-[#030712] font-semibold text-sm flex items-center gap-1.5 shadow-[0_0_12px_rgba(212,175,55,0.4)] disabled:opacity-50 cursor-pointer"
         >
           <Send className="w-4 h-4" />
           <span>Send</span>

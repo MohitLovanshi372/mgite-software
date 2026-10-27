@@ -1,18 +1,18 @@
 /**
- * JarvisTopBar Component
+ * JarvisTopBar Component (Golden Space Theme)
  *
- * Rebuilt Top Bar closely matching the reference desktop AI interface:
- * - Left: Glowing Arc Reactor icon + "JARVIS" (bold title) + "Your Personal AI Assistant"
- * - Center: Large digital clock (e.g. 14:28) with formatted date underneath
+ * Cinematic Golden Top Bar:
+ * - Left: Glowing Golden AI Emblem + "JARVIS" + "AI OPERATING SYSTEM"
+ * - Center: Digital Clock (font-mono tabular-nums) + Formatted Date
  * - Right:
- *    - Green status pill (Online)
+ *    - Status: Online indicator
+ *    - Sound FX Toggle
  *    - Settings button
- *    - Profile / System avatar circle
  *    - Window controls (Minimize, Maximize, Close)
  */
 
 import React, { useState, useEffect } from 'react';
-import { Settings, User, Minus, Square, X, Volume2, VolumeX, ShieldCheck } from 'lucide-react';
+import { Settings, Volume2, VolumeX, Minus, Square, X } from 'lucide-react';
 import { soundFx } from '../../utils/audioEffects.ts';
 
 interface JarvisTopBarProps {
@@ -26,8 +26,8 @@ export const JarvisTopBar: React.FC<JarvisTopBarProps> = ({
   onProfileClick,
   isOnline = true,
 }) => {
-  const [timeStr, setTimeStr] = useState('14:28');
-  const [dateStr, setDateStr] = useState('Sat, 17 May 2025');
+  const [timeStr, setTimeStr] = useState('14:28:00');
+  const [dateStr, setDateStr] = useState('Mon, 26 Oct 2026');
   const [extraSoundOn, setExtraSoundOn] = useState<boolean>(() => soundFx.isExtraSoundEnabled());
 
   useEffect(() => {
@@ -43,7 +43,8 @@ export const JarvisTopBar: React.FC<JarvisTopBarProps> = ({
       const now = new Date();
       const hours = now.getHours().toString().padStart(2, '0');
       const mins = now.getMinutes().toString().padStart(2, '0');
-      setTimeStr(`${hours}:${mins}`);
+      const secs = now.getSeconds().toString().padStart(2, '0');
+      setTimeStr(`${hours}:${mins}:${secs}`);
 
       const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const months = [
@@ -60,7 +61,6 @@ export const JarvisTopBar: React.FC<JarvisTopBarProps> = ({
 
   const handleMinimize = () => {
     soundFx.playClick();
-    // Electron ipcRenderer fallback if available
     if (typeof window !== 'undefined' && (window as any).electronAPI?.minimize) {
       (window as any).electronAPI.minimize();
     }
@@ -81,127 +81,111 @@ export const JarvisTopBar: React.FC<JarvisTopBarProps> = ({
   };
 
   return (
-    <header className="h-16 w-full px-5 py-2 flex items-center justify-between select-none relative z-30 bg-[#060b18]/80 backdrop-blur-xl border-b border-blue-900/30">
-      {/* Subtle top ambient cyan illumination line */}
-      <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-cyan-500/60 to-transparent" />
+    <header className="h-14 w-full px-5 py-2 flex items-center justify-between select-none relative z-30 bg-[#030712]/90 backdrop-blur-md border-b border-[#D4AF37]/20">
+      {/* Subtle top ambient golden illumination line */}
+      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#D4AF37]/40 to-transparent" />
 
-      {/* LEFT: JARVIS Identity & Subtitle */}
-      <div className="flex items-center gap-3.5">
-        {/* Glowing Arc Reactor Emblem */}
-        <div className="relative w-10 h-10 flex items-center justify-center">
-          <div className="absolute inset-0 rounded-full border border-cyan-500/40 animate-spin-slow" />
-          <div className="absolute inset-1 rounded-full border border-cyan-400/60 border-t-cyan-300" />
-          <div className="w-5 h-5 rounded-full bg-cyan-500/20 border border-cyan-400 flex items-center justify-center shadow-[0_0_12px_rgba(6,182,212,0.8)]">
-            <span className="w-2 h-2 rounded-full bg-cyan-300 shadow-[0_0_8px_#67e8f9] animate-pulse" />
+      {/* LEFT: JARVIS Identity */}
+      <div className="flex items-center gap-3">
+        {/* Golden Emblem */}
+        <div
+          onClick={onProfileClick}
+          className="relative w-8 h-8 flex items-center justify-center cursor-pointer group"
+          title="JARVIS System Core"
+        >
+          <div className="absolute inset-0 rounded-full border border-[#D4AF37]/40 animate-spin-slow group-hover:border-[#FFD76A]" />
+          <div className="w-4 h-4 rounded-full bg-[#D4AF37]/20 border border-[#FFD76A] flex items-center justify-center shadow-[0_0_10px_rgba(212,175,55,0.6)]">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#FFF5C0] shadow-[0_0_6px_#FFD76A] animate-pulse" />
           </div>
         </div>
 
         <div>
-          <h1 className="text-xl font-sans font-extrabold tracking-wider text-white flex items-center gap-2 drop-shadow-[0_0_12px_rgba(255,255,255,0.4)]">
-            JARVIS
-          </h1>
-          <p className="text-[11px] text-cyan-400/80 font-sans font-medium tracking-wide">
-            Your Personal AI Assistant
-          </p>
+          <div className="flex items-center gap-2">
+            <span className="text-base font-sans font-bold tracking-widest bg-gradient-to-r from-[#FFD76A] to-[#D4AF37] bg-clip-text text-transparent drop-shadow-[0_0_12px_rgba(212,175,55,0.3)]">
+              JARVIS
+            </span>
+            <span className="text-[10px] font-mono tracking-widest text-[#D4AF37]/70 uppercase hidden sm:inline">
+              v2.5
+            </span>
+          </div>
         </div>
       </div>
 
       {/* CENTER: Digital Clock & Date */}
-      <div className="flex flex-col items-center justify-center text-center">
-        <span className="text-2xl font-mono font-bold tracking-widest text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">
+      <div className="flex flex-col items-center justify-center">
+        <span className="font-mono tabular-nums text-base tracking-wider text-[#E8EAF0] font-semibold">
           {timeStr}
         </span>
-        <span className="text-[11px] text-zinc-400 font-sans tracking-wide">
+        <span className="text-[10px] font-sans tracking-wide text-[#D4AF37]/75">
           {dateStr}
         </span>
       </div>
 
-      {/* RIGHT: Status Badge, Settings, Profile, Window Controls */}
-      <div className="flex items-center gap-2.5">
-        {/* Clear Voice / Extra Sound Status Pill & Toggle */}
-        <button
-          onClick={() => {
-            const next = soundFx.toggleExtraSound();
-            setExtraSoundOn(next);
-          }}
-          title={
-            extraSoundOn
-              ? 'Extra Sound FX Enabled. Click to Mute Extra Sounds for Pure Clear Voice.'
-              : 'Clear Voice Active: All Extra Sounds Muted (Pure Vocal Audio).'
-          }
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[11px] font-sans font-medium transition-all cursor-pointer ${
-            !extraSoundOn
-              ? 'bg-cyan-950/40 border-cyan-500/50 text-cyan-300 shadow-[0_0_12px_rgba(6,182,212,0.25)] hover:border-cyan-400'
-              : 'bg-amber-950/40 border-amber-500/50 text-amber-300 hover:border-amber-400'
-          }`}
-        >
-          {!extraSoundOn ? (
-            <>
-              <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Clear Voice (No Extra Sound)</span>
-            </>
-          ) : (
-            <>
-              <VolumeX className="w-3.5 h-3.5 text-amber-400" />
-              <span>Extra FX: On</span>
-            </>
-          )}
-        </button>
-
-        {/* Online / Offline Status Badge */}
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/40 border border-emerald-500/40 shadow-[0_0_14px_rgba(16,185,129,0.25)]">
-          <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse' : 'bg-zinc-500'}`} />
-          <span className="text-xs font-sans font-semibold text-emerald-400">
-            {isOnline ? 'Online' : 'Offline'}
+      {/* RIGHT: Status, Settings, Controls */}
+      <div className="flex items-center gap-3">
+        {/* Online Status */}
+        <div className="flex items-center gap-1.5 text-xs font-mono text-[#E8EAF0] px-2.5 py-1 rounded-full bg-[#030712] border border-[#D4AF37]/25">
+          <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-[#FFD76A] shadow-[0_0_6px_#FFD76A]' : 'bg-red-400'}`} />
+          <span className="text-[11px] font-sans tracking-wide text-[#FFD76A] font-medium">
+            {isOnline ? 'ONLINE' : 'OFFLINE'}
           </span>
         </div>
 
+        {/* Audio Effects Toggle */}
+        <button
+          type="button"
+          onClick={() => {
+            soundFx.toggleExtraSound();
+            setExtraSoundOn(soundFx.isExtraSoundEnabled());
+          }}
+          title={extraSoundOn ? 'Acoustic Sound Effects: Enabled' : 'Acoustic Sound Effects: Muted'}
+          className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+            extraSoundOn
+              ? 'border-[#D4AF37]/40 text-[#FFD76A] bg-[#D4AF37]/10'
+              : 'border-slate-800 text-slate-500 hover:text-slate-300'
+          }`}
+        >
+          {extraSoundOn ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+        </button>
+
         {/* Settings Button */}
         <button
+          type="button"
           onClick={() => {
             soundFx.playClick();
             if (onSettingsClick) onSettingsClick();
           }}
-          title="Settings"
-          className="w-9 h-9 rounded-full bg-[#0a1428]/80 hover:bg-[#122244] border border-blue-500/30 hover:border-cyan-400 text-zinc-300 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-[0_0_10px_rgba(0,140,255,0.15)]"
+          title="Open Settings"
+          className="p-1.5 rounded-lg border border-[#D4AF37]/30 text-slate-300 hover:text-[#FFD76A] hover:border-[#FFD76A]/50 hover:bg-[#D4AF37]/10 transition-all cursor-pointer"
         >
-          <Settings className="w-4 h-4" />
+          <Settings className="w-3.5 h-3.5" />
         </button>
 
-        {/* Profile / System Icon */}
-        <button
-          onClick={() => {
-            soundFx.playClick();
-            if (onProfileClick) onProfileClick();
-          }}
-          title="User Profile"
-          className="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-600/30 to-blue-700/30 border border-cyan-400/60 flex items-center justify-center text-cyan-300 hover:text-white shadow-[0_0_12px_rgba(6,182,212,0.3)] cursor-pointer transition-all"
-        >
-          <User className="w-4 h-4" />
-        </button>
-
-        {/* Window Controls (Minimize, Maximize, Close) */}
-        <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-zinc-800">
+        {/* Window controls (minimize, maximize, close) */}
+        <div className="flex items-center gap-1 pl-1 border-l border-slate-800">
           <button
+            type="button"
             onClick={handleMinimize}
+            className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
             title="Minimize"
-            className="w-7 h-7 rounded-md hover:bg-zinc-800/80 text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
           >
-            <Minus className="w-3.5 h-3.5" />
+            <Minus className="w-3 h-3" />
           </button>
           <button
+            type="button"
             onClick={handleMaximize}
+            className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
             title="Maximize"
-            className="w-7 h-7 rounded-md hover:bg-zinc-800/80 text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
           >
-            <Square className="w-3 h-3" />
+            <Square className="w-2.5 h-2.5" />
           </button>
           <button
+            type="button"
             onClick={handleClose}
+            className="p-1 rounded text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
             title="Close"
-            className="w-7 h-7 rounded-md hover:bg-red-600/80 text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-3 h-3" />
           </button>
         </div>
       </div>

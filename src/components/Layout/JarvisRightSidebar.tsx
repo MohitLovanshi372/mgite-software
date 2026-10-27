@@ -1,41 +1,54 @@
 /**
- * JarvisRightSidebar Component
+ * JarvisRightSidebar Component (Golden Space Theme)
  *
- * Right intelligence panel matching the reference desktop AI interface:
- * 1. SYSTEM STATUS Card:
- *    - AI Online (Connected)
- *    - Voice Ready (Ready)
- *    - Gemini Connected (Online)
- *    - TTS Ready (Ready)
- * 2. CURRENT TASK Card:
- *    - Real running task/tool with circular animated spinner
- * 3. SECURITY Card:
- *    - Shield checkmark, "Protected", "Actions are monitored and secured."
- * 4. QUICK ACTIONS Card:
- *    - 2x2 grid: System Status, Open YouTube, Create Reminder, Take Note
- *    - Dispatches to real system handlers
+ * Right Panel matching strict layout requirements:
+ * 1. VOICE MODE SELECTOR:
+ *    - JARVIS CINEMATIC (Deep calm intelligent male AI)
+ *    - BIG BOSS POWERFUL (Deep bass dramatic Hindi announcer)
+ *    - NATURAL FEMALE ASSISTANT (Warm professional Hindi/Hinglish female)
+ *    - Preview voice button
+ * 2. LANGUAGE SELECTOR:
+ *    - Auto Detect, Hindi, English, Hinglish
+ * 3. COMPACT SYSTEM STATUS:
+ *    - AI Core: Gemini 2.5 Flash
+ *    - Voice Synthesis: Fish Audio / Neural
+ *    - Speech Recog: Active
+ *    - Airgap Shield: Protected
+ * 4. CURRENT TASK & ACTIVE PROCESSES:
+ *    - Real running task indicator
+ *    - Quick action triggers
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  ShieldCheck,
+  Mic,
+  Volume2,
+  Globe,
   Activity,
   Youtube,
   Calendar,
-  FileText,
-  CheckCircle2,
+  CheckSquare,
   Clock,
-  ExternalLink,
+  Sparkles,
+  Play,
 } from 'lucide-react';
+import {
+  ultronVoice,
+  JarvisVoicePersona,
+  JARVIS_VOICE_PERSONAS,
+} from '../../utils/ultronVoice.ts';
+import { LanguageMode } from '../../utils/pronunciationEngine.ts';
 import { soundFx } from '../../utils/audioEffects.ts';
 
 interface JarvisRightSidebarProps {
   currentTaskTitle?: string;
   isTaskRunning?: boolean;
-  onQuickAction?: (actionKey: 'system_status' | 'open_youtube' | 'create_reminder' | 'take_note') => void;
+  onQuickAction?: (actionKey: 'system_status' | 'open_youtube' | 'create_reminder' | 'open_tasks') => void;
   geminiConnected?: boolean;
   voiceReady?: boolean;
   ttsReady?: boolean;
+  onVoicePersonaChange?: (persona: JarvisVoicePersona) => void;
+  onLanguageChange?: (lang: LanguageMode) => void;
 }
 
 export const JarvisRightSidebar: React.FC<JarvisRightSidebarProps> = ({
@@ -45,8 +58,45 @@ export const JarvisRightSidebar: React.FC<JarvisRightSidebarProps> = ({
   geminiConnected = true,
   voiceReady = true,
   ttsReady = true,
+  onVoicePersonaChange,
+  onLanguageChange,
 }) => {
-  const handleAction = (key: 'system_status' | 'open_youtube' | 'create_reminder' | 'take_note') => {
+  const [selectedPersona, setSelectedPersona] = useState<JarvisVoicePersona>(() => ultronVoice.getVoicePersona());
+  const [selectedLang, setSelectedLang] = useState<LanguageMode>(() => ultronVoice.getLanguageMode());
+  const [isPreviewing, setIsPreviewing] = useState<boolean>(false);
+
+  useEffect(() => {
+    setSelectedPersona(ultronVoice.getVoicePersona());
+    setSelectedLang(ultronVoice.getLanguageMode());
+  }, []);
+
+  const handleSelectPersona = (persona: JarvisVoicePersona) => {
+    soundFx.playClick();
+    setSelectedPersona(persona);
+    ultronVoice.setVoicePersona(persona);
+    if (onVoicePersonaChange) {
+      onVoicePersonaChange(persona);
+    }
+  };
+
+  const handleSelectLanguage = (lang: LanguageMode) => {
+    soundFx.playClick();
+    setSelectedLang(lang);
+    ultronVoice.setLanguageMode(lang);
+    if (onLanguageChange) {
+      onLanguageChange(lang);
+    }
+  };
+
+  const handlePreviewPersona = async (e: React.MouseEvent, persona: JarvisVoicePersona) => {
+    e.stopPropagation();
+    soundFx.playClick();
+    setIsPreviewing(true);
+    await ultronVoice.previewVoicePersona(persona);
+    setIsPreviewing(false);
+  };
+
+  const handleAction = (key: 'system_status' | 'open_youtube' | 'create_reminder' | 'open_tasks') => {
     soundFx.playClick();
     if (onQuickAction) {
       onQuickAction(key);
@@ -54,165 +104,249 @@ export const JarvisRightSidebar: React.FC<JarvisRightSidebarProps> = ({
   };
 
   return (
-    <aside className="w-72 xl:w-80 h-full flex flex-col gap-3 shrink-0 select-none overflow-y-auto custom-scrollbar z-20">
-      {/* 1. SYSTEM STATUS CARD */}
-      <div className="p-4 rounded-2xl bg-[#091122]/85 backdrop-blur-xl border border-blue-500/20 shadow-[0_0_20px_rgba(0,140,255,0.06)] flex flex-col gap-3">
-        <div className="flex items-center justify-between pb-1 border-b border-blue-900/30">
-          <span className="text-xs font-sans font-bold tracking-wider text-cyan-400 uppercase">
-            SYSTEM STATUS
-          </span>
-          <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-            OPTIMAL
-          </span>
+    <aside className="w-68 xl:w-72 h-full flex flex-col gap-2.5 shrink-0 select-none overflow-y-auto custom-scrollbar z-20">
+      {/* 1. VOICE MODE SELECTOR */}
+      <div className="p-3.5 rounded-2xl bg-[#030712]/80 backdrop-blur-md border border-[#D4AF37]/20 shadow-[0_0_20px_rgba(212,175,55,0.04)] flex flex-col gap-2">
+        <div className="flex items-center justify-between pb-1.5 border-b border-[#D4AF37]/15">
+          <div className="flex items-center gap-1.5">
+            <Volume2 className="w-3.5 h-3.5 text-[#FFD76A]" />
+            <span className="text-[11px] font-sans font-bold tracking-wider text-[#FFD76A] uppercase">
+              VOICE MODE
+            </span>
+          </div>
+          <span className="text-[10px] font-mono text-[#D4AF37]/80">FISH AUDIO</span>
         </div>
 
-        <div className="space-y-2.5 text-xs font-sans">
-          {/* AI Online */}
-          <div className="flex items-center justify-between text-slate-300">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]" />
-              <span>AI Online</span>
+        <div className="space-y-1.5">
+          {/* Persona 1: JARVIS CINEMATIC */}
+          <div
+            onClick={() => handleSelectPersona('JARVIS_CINEMATIC')}
+            className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+              selectedPersona === 'JARVIS_CINEMATIC'
+                ? 'bg-gradient-to-r from-[#D4AF37]/20 to-[#FFD76A]/10 border-[#D4AF37] shadow-[0_0_12px_rgba(212,175,55,0.2)]'
+                : 'bg-[#030712]/60 border-[#D4AF37]/15 hover:border-[#D4AF37]/40 text-slate-400'
+            }`}
+          >
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className={`text-xs font-semibold ${selectedPersona === 'JARVIS_CINEMATIC' ? 'text-[#FFD76A]' : 'text-slate-200'}`}>
+                  JARVIS Cinematic
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 truncate">Deep calm intelligent male</p>
             </div>
-            <span className="text-emerald-400 font-medium">Connected</span>
+            <button
+              type="button"
+              onClick={(e) => handlePreviewPersona(e, 'JARVIS_CINEMATIC')}
+              title="Preview voice"
+              className="p-1 rounded-md bg-[#D4AF37]/15 hover:bg-[#D4AF37]/30 text-[#FFD76A] transition-colors"
+            >
+              <Play className="w-3 h-3 fill-current" />
+            </button>
           </div>
 
-          {/* Voice Ready */}
-          <div className="flex items-center justify-between text-slate-300">
-            <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${voiceReady ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]' : 'bg-amber-400'}`} />
-              <span>Voice Ready</span>
+          {/* Persona 2: BIG BOSS POWERFUL */}
+          <div
+            onClick={() => handleSelectPersona('BIG_BOSS_POWERFUL')}
+            className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+              selectedPersona === 'BIG_BOSS_POWERFUL'
+                ? 'bg-gradient-to-r from-[#D4AF37]/20 to-[#FFD76A]/10 border-[#D4AF37] shadow-[0_0_12px_rgba(212,175,55,0.2)]'
+                : 'bg-[#030712]/60 border-[#D4AF37]/15 hover:border-[#D4AF37]/40 text-slate-400'
+            }`}
+          >
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className={`text-xs font-semibold ${selectedPersona === 'BIG_BOSS_POWERFUL' ? 'text-[#FFD76A]' : 'text-slate-200'}`}>
+                  Big Boss Powerful
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 truncate">Deep bass Hindi announcer</p>
             </div>
-            <span className="text-emerald-400 font-medium">{voiceReady ? 'Ready' : 'Calibrating'}</span>
+            <button
+              type="button"
+              onClick={(e) => handlePreviewPersona(e, 'BIG_BOSS_POWERFUL')}
+              title="Preview voice"
+              className="p-1 rounded-md bg-[#D4AF37]/15 hover:bg-[#D4AF37]/30 text-[#FFD76A] transition-colors"
+            >
+              <Play className="w-3 h-3 fill-current" />
+            </button>
           </div>
 
-          {/* Gemini Connected */}
-          <div className="flex items-center justify-between text-slate-300">
-            <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${geminiConnected ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]' : 'bg-red-400'}`} />
-              <span>Gemini Connected</span>
+          {/* Persona 3: NATURAL FEMALE ASSISTANT */}
+          <div
+            onClick={() => handleSelectPersona('FEMALE_ASSISTANT')}
+            className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+              selectedPersona === 'FEMALE_ASSISTANT'
+                ? 'bg-gradient-to-r from-[#D4AF37]/20 to-[#FFD76A]/10 border-[#D4AF37] shadow-[0_0_12px_rgba(212,175,55,0.2)]'
+                : 'bg-[#030712]/60 border-[#D4AF37]/15 hover:border-[#D4AF37]/40 text-slate-400'
+            }`}
+          >
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className={`text-xs font-semibold ${selectedPersona === 'FEMALE_ASSISTANT' ? 'text-[#FFD76A]' : 'text-slate-200'}`}>
+                  Female Assistant
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 truncate">Warm Hindi/Hinglish female</p>
             </div>
-            <span className="text-emerald-400 font-medium">{geminiConnected ? 'Online' : 'Offline'}</span>
-          </div>
-
-          {/* TTS Ready */}
-          <div className="flex items-center justify-between text-slate-300">
-            <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${ttsReady ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]' : 'bg-amber-400'}`} />
-              <span>TTS Ready</span>
-            </div>
-            <span className="text-emerald-400 font-medium">{ttsReady ? 'Ready' : 'Initializing'}</span>
+            <button
+              type="button"
+              onClick={(e) => handlePreviewPersona(e, 'FEMALE_ASSISTANT')}
+              title="Preview voice"
+              className="p-1 rounded-md bg-[#D4AF37]/15 hover:bg-[#D4AF37]/30 text-[#FFD76A] transition-colors"
+            >
+              <Play className="w-3 h-3 fill-current" />
+            </button>
           </div>
         </div>
       </div>
 
-      {/* 2. CURRENT TASK CARD */}
-      <div className="p-4 rounded-2xl bg-[#091122]/85 backdrop-blur-xl border border-blue-500/20 shadow-[0_0_20px_rgba(0,140,255,0.06)] flex flex-col gap-3">
-        <div className="flex items-center justify-between pb-1 border-b border-blue-900/30">
-          <span className="text-xs font-sans font-bold tracking-wider text-cyan-400 uppercase">
+      {/* 2. LANGUAGE SELECTOR */}
+      <div className="p-3.5 rounded-2xl bg-[#030712]/80 backdrop-blur-md border border-[#D4AF37]/20 shadow-[0_0_20px_rgba(212,175,55,0.04)] flex flex-col gap-2">
+        <div className="flex items-center justify-between pb-1.5 border-b border-[#D4AF37]/15">
+          <div className="flex items-center gap-1.5">
+            <Globe className="w-3.5 h-3.5 text-[#FFD76A]" />
+            <span className="text-[11px] font-sans font-bold tracking-wider text-[#FFD76A] uppercase">
+              LANGUAGE
+            </span>
+          </div>
+          <span className="text-[10px] font-mono text-[#FFD76A] uppercase">{selectedLang}</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-1 text-[11px]">
+          {(['AUTO', 'HINDI', 'ENGLISH', 'HINGLISH'] as LanguageMode[]).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => handleSelectLanguage(mode)}
+              className={`py-1.5 px-2 rounded-lg border text-center transition-all cursor-pointer font-sans ${
+                selectedLang === mode
+                  ? 'bg-[#D4AF37]/20 border-[#D4AF37] text-[#FFD76A] font-semibold shadow-[0_0_10px_rgba(212,175,55,0.15)]'
+                  : 'bg-[#030712] border-[#D4AF37]/15 text-slate-400 hover:text-slate-200 hover:border-[#D4AF37]/30'
+              }`}
+            >
+              {mode === 'AUTO' && 'Auto Detect'}
+              {mode === 'HINDI' && 'हिन्दी (Hindi)'}
+              {mode === 'ENGLISH' && 'English'}
+              {mode === 'HINGLISH' && 'Hinglish'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 3. COMPACT SYSTEM STATUS */}
+      <div className="p-3.5 rounded-2xl bg-[#030712]/80 backdrop-blur-md border border-[#D4AF37]/20 shadow-[0_0_20px_rgba(212,175,55,0.04)] flex flex-col gap-2">
+        <div className="flex items-center justify-between pb-1.5 border-b border-[#D4AF37]/15">
+          <span className="text-[11px] font-sans font-bold tracking-wider text-[#FFD76A] uppercase">
+            AI & SYSTEM STATUS
+          </span>
+          <span className="text-[10px] font-mono text-[#FFD76A] bg-[#D4AF37]/10 border border-[#D4AF37]/30 px-2 py-0.5 rounded-full">
+            ONLINE
+          </span>
+        </div>
+
+        <div className="space-y-1.5 text-xs font-sans">
+          {/* AI Brain */}
+          <div className="flex items-center justify-between text-slate-300">
+            <span className="text-slate-300">Gemini Brain</span>
+            <span className="text-[#FFD76A] font-mono text-[11px] font-medium">gemini-2.5-flash</span>
+          </div>
+
+          {/* Voice Engine */}
+          <div className="flex items-center justify-between text-slate-300">
+            <span className="text-slate-300">TTS Engine</span>
+            <span className="text-[#FFD76A] font-mono text-[11px] font-medium">Fish Audio (s2.1-pro)</span>
+          </div>
+
+          {/* Fallback */}
+          <div className="flex items-center justify-between text-slate-300">
+            <span className="text-slate-300">Local Fallback</span>
+            <span className="text-emerald-400 font-mono text-[11px]">Ready</span>
+          </div>
+
+          {/* Security Gate */}
+          <div className="flex items-center justify-between text-slate-300">
+            <span className="text-slate-300">Privacy Shield</span>
+            <span className="text-[#FFD76A] font-mono text-[11px]">Active</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. CURRENT TASK PANEL */}
+      <div className="p-3.5 rounded-2xl bg-[#030712]/80 backdrop-blur-md border border-[#D4AF37]/20 shadow-[0_0_20px_rgba(212,175,55,0.04)] flex flex-col gap-2">
+        <div className="flex items-center justify-between pb-1.5 border-b border-[#D4AF37]/15">
+          <span className="text-[11px] font-sans font-bold tracking-wider text-[#FFD76A] uppercase">
             CURRENT TASK
           </span>
-          {isTaskRunning && (
-            <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/60 border border-cyan-500/30 px-2 py-0.5 rounded-full animate-pulse">
-              RUNNING
-            </span>
-          )}
+          <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${
+            isTaskRunning
+              ? 'text-[#FFD76A] bg-[#D4AF37]/15 border border-[#D4AF37]/40 animate-pulse'
+              : 'text-slate-400 bg-slate-900 border border-slate-800'
+          }`}>
+            {isTaskRunning ? 'RUNNING' : 'STANDBY'}
+          </span>
         </div>
 
-        <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-[#060b18]/80 border border-blue-900/40">
-          <div className="flex items-center gap-3 min-w-0">
-            {/* Task Icon (YouTube or Activity) */}
-            <div className="w-9 h-9 rounded-lg bg-red-600/20 border border-red-500/40 flex items-center justify-center shrink-0">
-              {currentTaskTitle.toLowerCase().includes('youtube') ? (
-                <Youtube className="w-5 h-5 text-red-500" />
-              ) : (
-                <Activity className="w-5 h-5 text-cyan-400" />
-              )}
-            </div>
-
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs font-sans font-medium text-white truncate">
-                {currentTaskTitle}
-              </span>
-              <span className="text-[10px] text-slate-400 font-sans">
-                {isTaskRunning ? 'Executing secure tool...' : 'Idle • Ready for input'}
-              </span>
-            </div>
+        <div className="flex items-center gap-2.5 py-1">
+          <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+            isTaskRunning
+              ? 'border border-[#FFD76A] animate-spin text-[#FFD76A]'
+              : 'border border-[#D4AF37]/30 text-slate-500'
+          }`}>
+            <Clock className="w-3 h-3" />
           </div>
-
-          {/* Animated Spinner or Check Icon */}
-          <div className="shrink-0">
-            {isTaskRunning ? (
-              <div className="w-5 h-5 rounded-full border-2 border-cyan-500/30 border-t-cyan-400 animate-spin" />
-            ) : (
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-            )}
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-[#E8EAF0] font-medium truncate">
+              {currentTaskTitle}
+            </p>
+            <p className="text-[10px] text-[#D4AF37]/70 truncate">
+              {isTaskRunning ? 'Processing directive...' : 'Standing by for instruction'}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* 3. SECURITY CARD */}
-      <div className="p-4 rounded-2xl bg-[#091122]/85 backdrop-blur-xl border border-blue-500/20 shadow-[0_0_20px_rgba(0,140,255,0.06)] flex flex-col gap-2.5">
-        <span className="text-xs font-sans font-bold tracking-wider text-cyan-400 uppercase pb-1 border-b border-blue-900/30">
-          SECURITY
+      {/* 5. QUICK DIRECTIVES */}
+      <div className="p-3 rounded-2xl bg-[#030712]/80 backdrop-blur-md border border-[#D4AF37]/20 shadow-[0_0_20px_rgba(212,175,55,0.04)] flex flex-col gap-2">
+        <span className="text-[11px] font-sans font-bold tracking-wider text-[#FFD76A] uppercase pb-1 border-b border-[#D4AF37]/15">
+          QUICK DIRECTIVES
         </span>
 
-        <div className="flex items-center gap-3.5 p-2">
-          <div className="w-10 h-10 rounded-full bg-emerald-950/60 border border-emerald-500/50 flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.3)] shrink-0">
-            <ShieldCheck className="w-6 h-6 text-emerald-400" />
-          </div>
-
-          <div className="flex flex-col">
-            <span className="text-sm font-sans font-bold text-emerald-400 tracking-wide">
-              Protected
-            </span>
-            <span className="text-[11px] text-slate-400 leading-snug">
-              Actions are monitored and secured.
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. QUICK ACTIONS CARD */}
-      <div className="p-4 rounded-2xl bg-[#091122]/85 backdrop-blur-xl border border-blue-500/20 shadow-[0_0_20px_rgba(0,140,255,0.06)] flex flex-col gap-3">
-        <span className="text-xs font-sans font-bold tracking-wider text-cyan-400 uppercase pb-1 border-b border-blue-900/30">
-          QUICK ACTIONS
-        </span>
-
-        <div className="grid grid-cols-2 gap-2 text-xs font-sans">
-          {/* Action 1: System Status */}
+        <div className="grid grid-cols-2 gap-1.5 text-xs">
           <button
+            type="button"
             onClick={() => handleAction('system_status')}
-            className="p-3 rounded-xl bg-[#0c162b]/80 hover:bg-[#132347] border border-blue-500/25 hover:border-cyan-400 flex flex-col items-center justify-center gap-2 text-center text-slate-200 hover:text-white transition-all cursor-pointer group"
+            className="p-2 rounded-xl bg-[#030712] border border-[#D4AF37]/20 hover:border-[#FFD76A]/50 hover:bg-[#D4AF37]/10 text-slate-300 hover:text-[#FFD76A] transition-all flex items-center gap-2 cursor-pointer text-left"
           >
-            <Activity className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
-            <span className="text-[11px] font-medium leading-tight">System Status</span>
+            <Activity className="w-3.5 h-3.5 text-[#D4AF37] shrink-0" />
+            <span className="text-[11px] truncate">Status</span>
           </button>
 
-          {/* Action 2: Open YouTube */}
           <button
+            type="button"
             onClick={() => handleAction('open_youtube')}
-            className="p-3 rounded-xl bg-[#0c162b]/80 hover:bg-[#132347] border border-blue-500/25 hover:border-cyan-400 flex flex-col items-center justify-center gap-2 text-center text-slate-200 hover:text-white transition-all cursor-pointer group"
+            className="p-2 rounded-xl bg-[#030712] border border-[#D4AF37]/20 hover:border-[#FFD76A]/50 hover:bg-[#D4AF37]/10 text-slate-300 hover:text-[#FFD76A] transition-all flex items-center gap-2 cursor-pointer text-left"
           >
-            <Youtube className="w-4 h-4 text-red-500 group-hover:scale-110 transition-transform" />
-            <span className="text-[11px] font-medium leading-tight">Open YouTube</span>
+            <Youtube className="w-3.5 h-3.5 text-red-400 shrink-0" />
+            <span className="text-[11px] truncate">YouTube</span>
           </button>
 
-          {/* Action 3: Create Reminder */}
           <button
+            type="button"
             onClick={() => handleAction('create_reminder')}
-            className="p-3 rounded-xl bg-[#0c162b]/80 hover:bg-[#132347] border border-blue-500/25 hover:border-cyan-400 flex flex-col items-center justify-center gap-2 text-center text-slate-200 hover:text-white transition-all cursor-pointer group"
+            className="p-2 rounded-xl bg-[#030712] border border-[#D4AF37]/20 hover:border-[#FFD76A]/50 hover:bg-[#D4AF37]/10 text-slate-300 hover:text-[#FFD76A] transition-all flex items-center gap-2 cursor-pointer text-left"
           >
-            <Calendar className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
-            <span className="text-[11px] font-medium leading-tight">Create Reminder</span>
+            <Calendar className="w-3.5 h-3.5 text-[#D4AF37] shrink-0" />
+            <span className="text-[11px] truncate">Reminder</span>
           </button>
 
-          {/* Action 4: Take Note */}
           <button
-            onClick={() => handleAction('take_note')}
-            className="p-3 rounded-xl bg-[#0c162b]/80 hover:bg-[#132347] border border-blue-500/25 hover:border-cyan-400 flex flex-col items-center justify-center gap-2 text-center text-slate-200 hover:text-white transition-all cursor-pointer group"
+            type="button"
+            onClick={() => handleAction('open_tasks')}
+            className="p-2 rounded-xl bg-[#030712] border border-[#D4AF37]/20 hover:border-[#FFD76A]/50 hover:bg-[#D4AF37]/10 text-slate-300 hover:text-[#FFD76A] transition-all flex items-center gap-2 cursor-pointer text-left"
           >
-            <FileText className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
-            <span className="text-[11px] font-medium leading-tight">Take Note</span>
+            <CheckSquare className="w-3.5 h-3.5 text-[#FFD76A] shrink-0" />
+            <span className="text-[11px] truncate">Tasks</span>
           </button>
         </div>
       </div>

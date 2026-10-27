@@ -7,6 +7,7 @@ export type NavigationPageId =
   | 'chat'
   | 'voice'
   | 'tasks'
+  | 'calendar'
   | 'memory'
   | 'tools'
   | 'notifications'

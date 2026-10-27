@@ -648,5 +648,125 @@ apiRouter.post('/api/notifications/config', (req: Request, res: Response) => {
   }
 });
 
+// ==========================================
+// Phase 5: Persistent Tasks & Reminders API
+// ==========================================
+
+apiRouter.get('/api/tasks', (_req: Request, res: Response) => {
+  try {
+    const tasks = memoryEngine.listTasks();
+    res.json(tasks);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+apiRouter.post('/api/tasks', (req: Request, res: Response) => {
+  try {
+    const task = memoryEngine.createTask(req.body);
+    logger.info('TasksAPI', `Created persistent task: ${task.title} (${task.id})`);
+    res.json(task);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+apiRouter.patch('/api/tasks/:id', (req: Request, res: Response) => {
+  try {
+    const updated = memoryEngine.updateTask(req.params.id, req.body);
+    if (!updated) {
+      res.status(404).json({ error: 'Task not found' });
+      return;
+    }
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+apiRouter.put('/api/tasks/:id', (req: Request, res: Response) => {
+  try {
+    const updated = memoryEngine.updateTask(req.params.id, req.body);
+    if (!updated) {
+      res.status(404).json({ error: 'Task not found' });
+      return;
+    }
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+apiRouter.delete('/api/tasks/:id', (req: Request, res: Response) => {
+  try {
+    const deleted = memoryEngine.deleteTask(req.params.id);
+    if (!deleted) {
+      res.status(404).json({ error: 'Task not found' });
+      return;
+    }
+    res.json({ success: true, id: req.params.id });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+apiRouter.get('/api/reminders', (_req: Request, res: Response) => {
+  try {
+    const reminders = memoryEngine.listReminders();
+    res.json(reminders);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+apiRouter.post('/api/reminders', (req: Request, res: Response) => {
+  try {
+    const reminder = memoryEngine.createReminder(req.body);
+    logger.info('RemindersAPI', `Created persistent reminder: ${reminder.title} (${reminder.id})`);
+    res.json(reminder);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+apiRouter.patch('/api/reminders/:id', (req: Request, res: Response) => {
+  try {
+    const updated = memoryEngine.updateReminder(req.params.id, req.body);
+    if (!updated) {
+      res.status(404).json({ error: 'Reminder not found' });
+      return;
+    }
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+apiRouter.put('/api/reminders/:id', (req: Request, res: Response) => {
+  try {
+    const updated = memoryEngine.updateReminder(req.params.id, req.body);
+    if (!updated) {
+      res.status(404).json({ error: 'Reminder not found' });
+      return;
+    }
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+apiRouter.delete('/api/reminders/:id', (req: Request, res: Response) => {
+  try {
+    const deleted = memoryEngine.deleteReminder(req.params.id);
+    if (!deleted) {
+      res.status(404).json({ error: 'Reminder not found' });
+      return;
+    }
+    res.json({ success: true, id: req.params.id });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 

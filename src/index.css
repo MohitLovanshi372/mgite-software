@@ -1,20 +1,20 @@
 @import "tailwindcss";
 
 @layer utilities {
-  /* Crimson red custom scrollbar for solar dark OS */
+  /* Golden custom scrollbar for Golden Space OS */
   .custom-scrollbar::-webkit-scrollbar {
     width: 4px;
     height: 4px;
   }
   .custom-scrollbar::-webkit-scrollbar-track {
-    background: rgba(10, 10, 12, 0.8);
+    background: rgba(3, 7, 18, 0.85);
   }
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(220, 38, 38, 0.4);
+    background: rgba(212, 175, 55, 0.35);
     border-radius: 2px;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(239, 68, 68, 0.8);
+    background: rgba(255, 215, 106, 0.75);
   }
 
   /* Angular HUD Corner Clips */

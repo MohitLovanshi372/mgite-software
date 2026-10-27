@@ -42,6 +42,52 @@ export interface VoiceSpeakOptions {
   enhancePronunciation?: boolean;
 }
 
+export type JarvisVoicePersona = 'JARVIS_CINEMATIC' | 'BIG_BOSS_POWERFUL' | 'FEMALE_ASSISTANT';
+
+export interface VoicePersonaConfig {
+  id: JarvisVoicePersona;
+  name: string;
+  subtitle: string;
+  description: string;
+  defaultPitch: number;
+  defaultRate: number;
+  fishReferenceId: string;
+  previewSample: string;
+}
+
+export const JARVIS_VOICE_PERSONAS: Record<JarvisVoicePersona, VoicePersonaConfig> = {
+  JARVIS_CINEMATIC: {
+    id: 'JARVIS_CINEMATIC',
+    name: 'JARVIS Cinematic',
+    subtitle: 'Deep calm intelligent male AI',
+    description: 'Iconic smooth baritone voice calibrated for deep intelligence, logic and tactical operations.',
+    defaultPitch: 0.88,
+    defaultRate: 0.96,
+    fishReferenceId: '817eba7f1aea469f9802326568d427b9',
+    previewSample: 'JARVIS neural core online. All orbital systems and subroutines are fully nominal, Mohit.',
+  },
+  BIG_BOSS_POWERFUL: {
+    id: 'BIG_BOSS_POWERFUL',
+    name: 'Big Boss Powerful',
+    subtitle: 'Deep bass authoritative announcer',
+    description: 'Resonant deep bass Hindi voice with commanding presence and dramatic announcer cadence.',
+    defaultPitch: 0.72,
+    defaultRate: 0.90,
+    fishReferenceId: '4b9612089b02446f8ee441e88d8b688d',
+    previewSample: 'Dhyan dejiye. Big Boss chahte hain ki aap apna agla mission directive turant jaari karein.',
+  },
+  FEMALE_ASSISTANT: {
+    id: 'FEMALE_ASSISTANT',
+    name: 'Natural Female Assistant',
+    subtitle: 'Warm professional Hindi/Hinglish',
+    description: 'Natural, warm, crystal-clear Hindi and Hinglish conversational female assistant.',
+    defaultPitch: 1.08,
+    defaultRate: 1.0,
+    fishReferenceId: '8a30eb6bc79a4056a2f7c0060938ff5f',
+    previewSample: 'Namaste! Main aapki personal AI assistant hoon. Batayein, main aapki kya madad kar sakti hoon?',
+  },
+};
+
 class UltronVoiceEngine {
   private synth: SpeechSynthesis | null = null;
   private audioCtx: AudioContext | null = null;
@@ -61,6 +107,13 @@ class UltronVoiceEngine {
   private similarityBoost: number = 0.95;
   private activeProfile: string = 'JARVIS_CLEAR';
   private clearVoiceMode: boolean = true; // High-clarity mode: zero sub-bass drone, zero clicks
+  private activePersona: JarvisVoicePersona = 'JARVIS_CINEMATIC';
+
+  // Real Audio Reactivity (Web Audio API Analyser)
+  private currentAudioElement: HTMLAudioElement | null = null;
+  private mediaSourceNode: MediaElementAudioSourceNode | null = null;
+  private analyserNode: AnalyserNode | null = null;
+  private frequencyDataBuffer: Uint8Array | null = null;
 
   // Multilingual & Pronunciation Configuration
   private languageMode: LanguageMode = 'AUTO';
@@ -615,18 +668,24 @@ class UltronVoiceEngine {
   /**
    * Synthesize speech via Fish Audio API backend endpoint with Jarvis voice
    */
+  /**
+   * Synthesize speech via Fish Audio API backend endpoint with active Jarvis persona
+   */
   public async speakViaFishAudio(text: string, options?: VoiceSpeakOptions): Promise<boolean> {
     if (typeof window === 'undefined') return false;
     try {
+      const personaConfig = JARVIS_VOICE_PERSONAS[this.activePersona] || JARVIS_VOICE_PERSONAS.JARVIS_CINEMATIC;
+      const effectiveRate = options?.rate ?? personaConfig.defaultRate ?? this.rate;
+
       const res = await fetch('/api/voice/synthesize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text,
           provider: 'fishaudio',
-          reference_id: '817eba7f1aea469f9802326568d427b9',
+          reference_id: personaConfig.fishReferenceId,
           model: 's2.1-pro',
-          rate: options?.rate ?? this.rate,
+          rate: effectiveRate,
           volume: options?.volume ?? this.volume,
         }),
       });
@@ -637,16 +696,43 @@ class UltronVoiceEngine {
           const audioUri = `data:${data.contentType || 'audio/mpeg'};base64,${data.audioBase64}`;
           const audio = new Audio(audioUri);
           audio.volume = options?.volume ?? this.volume;
+          this.currentAudioElement = audio;
+
+          // Wire into Web Audio API Analyser for real-time audio reactivity
+          try {
+            const ctx = this.getAudioContext();
+            if (ctx) {
+              const source = ctx.createMediaElementSource(audio);
+              const analyser = ctx.createAnalyser();
+              analyser.fftSize = 64;
+              analyser.smoothingTimeConstant = 0.8;
+              source.connect(analyser);
+              analyser.connect(ctx.destination);
+              this.analyserNode = analyser;
+              this.frequencyDataBuffer = new Uint8Array(analyser.frequencyBinCount);
+            }
+          } catch (_) {
+            // Audio context source already connected or unsupported
+          }
+
           this.isSpeaking = true;
+          audioEchoGuard.onSpeechStart(text);
           if (options?.onStart) options.onStart();
+
           audio.onended = () => {
             this.isSpeaking = false;
+            this.currentAudioElement = null;
+            audioEchoGuard.onSpeechEnd();
             if (options?.onEnd) options.onEnd();
           };
+
           audio.onerror = () => {
             this.isSpeaking = false;
+            this.currentAudioElement = null;
+            audioEchoGuard.onSpeechEnd();
             this.speakViaWebSpeech(text, options);
           };
+
           await audio.play();
           return true;
         }
@@ -656,7 +742,7 @@ class UltronVoiceEngine {
   }
 
   /**
-   * Speaks text using Fish Audio API (Jarvis Hindi Model), with seamless
+   * Speaks text using Fish Audio API (Jarvis Neural Personas), with seamless
    * local speech synthesis fallback.
    */
   public speak(
@@ -685,7 +771,7 @@ class UltronVoiceEngine {
   }
 
   /**
-   * Local browser Web Speech API synthesis fallback
+   * Local browser Web Speech API synthesis fallback (Persona-Aware)
    */
   public speakViaWebSpeech(
     text: string,
@@ -728,10 +814,11 @@ class UltronVoiceEngine {
 
     this.lastDetectedLanguage = pronunciation.detectedLanguage;
 
-    // 2. Select appropriate Voice
+    // 2. Persona-aware voice & pitch selection
+    const personaConfig = JARVIS_VOICE_PERSONAS[this.activePersona] || JARVIS_VOICE_PERSONAS.JARVIS_CINEMATIC;
     const targetVoice = options?.voiceURI
-      ? this.allVoices.find((v) => v.voiceURI === options.voiceURI) || this.getBestVoiceForLanguage(pronunciation.detectedLanguage)
-      : this.getBestVoiceForLanguage(pronunciation.detectedLanguage);
+      ? this.allVoices.find((v) => v.voiceURI === options.voiceURI) || this.getBestVoiceForPersona(this.activePersona, pronunciation.detectedLanguage)
+      : this.getBestVoiceForPersona(this.activePersona, pronunciation.detectedLanguage);
 
     if (targetVoice) {
       this.voice = targetVoice;
@@ -747,15 +834,17 @@ class UltronVoiceEngine {
 
     utterance.lang = options?.lang || pronunciation.recommendedLocale;
 
-    if (pronunciation.isHindi) {
-      utterance.pitch = options?.pitch !== undefined ? options.pitch : 1.0;
-      utterance.rate = options?.rate !== undefined ? options.rate : 0.98;
-    } else if (pronunciation.isHinglish) {
-      utterance.pitch = options?.pitch !== undefined ? options.pitch : 1.0;
-      utterance.rate = options?.rate !== undefined ? options.rate : 0.98;
+    // Set persona-calibrated pitch and rate
+    if (options?.pitch !== undefined) {
+      utterance.pitch = options.pitch;
     } else {
-      utterance.pitch = options?.pitch !== undefined ? options.pitch : this.pitch;
-      utterance.rate = options?.rate !== undefined ? options.rate : this.rate;
+      utterance.pitch = personaConfig.defaultPitch;
+    }
+
+    if (options?.rate !== undefined) {
+      utterance.rate = options.rate;
+    } else {
+      utterance.rate = personaConfig.defaultRate;
     }
 
     utterance.volume = options?.volume !== undefined ? options.volume : this.volume;
@@ -764,7 +853,9 @@ class UltronVoiceEngine {
       this.isSpeaking = true;
       audioEchoGuard.onSpeechStart(textToSpeak);
       this.playVocalClick('OPEN');
-      this.startSubBassResonance(pronunciation.isHindi || pronunciation.isHinglish);
+      if (this.activePersona === 'BIG_BOSS_POWERFUL') {
+        this.startSubBassResonance(true);
+      }
       if (options?.onStart) options.onStart();
     };
 
@@ -791,9 +882,58 @@ class UltronVoiceEngine {
   }
 
   /**
-   * Cancels current active speech and streaming immediately
+   * Resolves the best system voice matching the selected Persona & Language
+   */
+  public getBestVoiceForPersona(persona: JarvisVoicePersona, lang: DetectedVoiceLanguage): SpeechSynthesisVoice | null {
+    if (this.allVoices.length === 0) {
+      this.refreshVoiceList();
+    }
+
+    if (persona === 'JARVIS_CINEMATIC') {
+      // Prefer deep British / US male voice
+      const preferredJarvis = ['daniel', 'george', 'david', 'arthur', 'oliver', 'google uk english male', 'microsoft george'];
+      for (const pref of preferredJarvis) {
+        const match = this.allVoices.find((v) => v.name.toLowerCase().includes(pref));
+        if (match) return match;
+      }
+      const maleVoice = this.allVoices.find((v) => v.lang.startsWith('en') && (v.name.toLowerCase().includes('male') || !v.name.toLowerCase().includes('female')));
+      if (maleVoice) return maleVoice;
+    } else if (persona === 'BIG_BOSS_POWERFUL') {
+      // Prefer resonant Hindi / Indian male voice
+      const preferredBigBoss = ['hemant', 'rishi', 'google हिन्दी', 'microsoft hemant', 'india'];
+      for (const pref of preferredBigBoss) {
+        const match = this.allVoices.find((v) => v.name.toLowerCase().includes(pref));
+        if (match) return match;
+      }
+      if (this.hindiVoices.length > 0) return this.hindiVoices[0];
+    } else if (persona === 'FEMALE_ASSISTANT') {
+      // Prefer warm natural female voice (Hindi or Indian English or Global)
+      const preferredFemale = ['kalpana', 'swara', 'heera', 'neerja', 'veena', 'samantha', 'zira', 'kore', 'jenny', 'aria'];
+      for (const pref of preferredFemale) {
+        const match = this.allVoices.find((v) => v.name.toLowerCase().includes(pref));
+        if (match) return match;
+      }
+      const femaleVoice = this.allVoices.find((v) => v.name.toLowerCase().includes('female'));
+      if (femaleVoice) return femaleVoice;
+    }
+
+    return this.getBestVoiceForLanguage(lang);
+  }
+
+  /**
+   * Cancels current active speech, streaming, or playback immediately
    */
   public stop() {
+    // 1. Pause and reset active HTML5 audio element
+    if (this.currentAudioElement) {
+      try {
+        this.currentAudioElement.pause();
+        this.currentAudioElement.currentTime = 0;
+      } catch (_) {}
+      this.currentAudioElement = null;
+    }
+
+    // 2. Cancel WebSocket streaming requests
     if (this.currentStreamRequestId && this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({
         type: 'cancel',
@@ -809,11 +949,13 @@ class UltronVoiceEngine {
     this.nextChunkScheduledTime = 0;
     this.chunkDecodeQueue = Promise.resolve();
 
+    // 3. Cancel Web Speech API
     if (this.synth) {
       this.synth.cancel();
     }
     this.stopSubBassResonance();
     this.isSpeaking = false;
+    audioEchoGuard.onSpeechEnd();
   }
 
   /**
@@ -821,6 +963,72 @@ class UltronVoiceEngine {
    */
   public getSpeakingStatus(): boolean {
     return this.isSpeaking;
+  }
+
+  /**
+   * Returns real-time audio RMS energy level [0.0 - 1.0] from Web Audio API Analyser
+   */
+  public getAudioEnergyLevel(): number {
+    if (!this.isSpeaking) return 0;
+    if (this.analyserNode && this.frequencyDataBuffer) {
+      this.analyserNode.getByteFrequencyData(this.frequencyDataBuffer);
+      let sum = 0;
+      for (let i = 0; i < this.frequencyDataBuffer.length; i++) {
+        sum += this.frequencyDataBuffer[i];
+      }
+      const avg = sum / this.frequencyDataBuffer.length;
+      return Math.min(1.0, avg / 128.0);
+    }
+    return 0.5;
+  }
+
+  /**
+   * Returns raw frequency bins from Web Audio Analyser
+   */
+  public getAudioFrequencyData(): Uint8Array | null {
+    if (!this.isSpeaking || !this.analyserNode || !this.frequencyDataBuffer) {
+      return null;
+    }
+    this.analyserNode.getByteFrequencyData(this.frequencyDataBuffer);
+    return this.frequencyDataBuffer;
+  }
+
+  // --- Voice Persona Management ---
+
+  public setVoicePersona(persona: JarvisVoicePersona): void {
+    if (JARVIS_VOICE_PERSONAS[persona]) {
+      this.activePersona = persona;
+      const config = JARVIS_VOICE_PERSONAS[persona];
+      this.pitch = config.defaultPitch;
+      this.rate = config.defaultRate;
+    }
+  }
+
+  public getVoicePersona(): JarvisVoicePersona {
+    return this.activePersona;
+  }
+
+  public getVoicePersonaConfig(persona?: JarvisVoicePersona): VoicePersonaConfig {
+    return JARVIS_VOICE_PERSONAS[persona || this.activePersona] || JARVIS_VOICE_PERSONAS.JARVIS_CINEMATIC;
+  }
+
+  public getAvailableVoicePersonas(): VoicePersonaConfig[] {
+    return Object.values(JARVIS_VOICE_PERSONAS);
+  }
+
+  public async previewVoicePersona(persona?: JarvisVoicePersona): Promise<boolean> {
+    const targetPersona = persona || this.activePersona;
+    const config = JARVIS_VOICE_PERSONAS[targetPersona];
+    if (!config) return false;
+    this.stop();
+    const prevPersona = this.activePersona;
+    this.activePersona = targetPersona;
+    this.speak(config.previewSample, {
+      onEnd: () => {
+        this.activePersona = prevPersona;
+      },
+    });
+    return true;
   }
 
   // --- Configuration Setters & Getters ---

@@ -52,16 +52,19 @@ export class GeminiProvider extends AIProvider {
     const lower = clean.toLowerCase();
 
     // Map family shorthand strings to supported API endpoints
+    if (lower === 'gemini-3.8') {
+      return 'gemini-3.6-flash';
+    }
     if (
-      lower === 'gemini-3.8' ||
       lower === 'gemini-3.8-flash' ||
       lower === 'gemini-3.6' ||
       lower === 'gemini-2.5' ||
       lower === 'gemini-2.5-flash' ||
       lower === 'gemini-2.0-flash' ||
-      lower === 'gemini-1.5-flash'
+      lower === 'gemini-1.5-flash' ||
+      lower === 'gemini-flash'
     ) {
-      return 'gemini-3.6-flash';
+      return 'gemini-3.8-flash';
     }
 
     return clean;
@@ -96,7 +99,7 @@ export class GeminiProvider extends AIProvider {
         apiKey,
         httpOptions: {
           headers: {
-            'User-Agent': 'personal-ai-assistant/0.2.0',
+            'User-Agent': 'aistudio-build',
           },
         },
       });
@@ -217,6 +220,33 @@ export class GeminiProvider extends AIProvider {
         isOffline: false,
       };
     } catch (err: unknown) {
+      const errStr = String((err as any)?.message || err);
+      if ((errStr.includes('503') || errStr.includes('high demand') || errStr.includes('spikes in demand')) && model !== 'gemini-3.1-flash-lite') {
+        logger.warn('GeminiProvider', `Model ${model} experienced temporary demand spike (503). Retrying with gemini-3.1-flash-lite fallback.`);
+        try {
+          const ai = this.getClient();
+          const fallbackResp = await ai.models.generateContent({
+            model: 'gemini-3.1-flash-lite',
+            contents: this.buildContents(request),
+            config: {
+              systemInstruction,
+              temperature: request.temperature ?? config.temperature ?? 0.7,
+            },
+          });
+          const reply = fallbackResp?.text?.trim();
+          if (reply) {
+            logger.info('GeminiProvider', `Successfully received ${reply.length} chars from gemini-3.1-flash-lite fallback.`);
+            return {
+              text: reply,
+              provider: this.id,
+              model: 'gemini-3.1-flash-lite',
+              isOffline: false,
+            };
+          }
+        } catch (fallbackErr: any) {
+          logger.error('GeminiProvider', `Fallback to gemini-3.1-flash-lite also failed: ${fallbackErr?.message}`);
+        }
+      }
       return this.handleError(err, model);
     } finally {
       if (timeoutId) {

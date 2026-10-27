@@ -67,6 +67,27 @@ export interface StoreMemoryInput {
   source?: MemorySource;
 }
 
+export interface TaskRecord {
+  id: string;
+  title: string;
+  completed: boolean;
+  priority: 'CRITICAL' | 'ELEVATED' | 'STANDARD';
+  sector: string;
+  dueTime: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReminderRecord {
+  id: string;
+  title: string;
+  datetime: string;
+  recurrence: string;
+  note: string;
+  status: 'PENDING' | 'TRIGGERED' | 'DISMISSED';
+  createdAt: string;
+}
+
 export class MemoryEngine {
   private db: DatabaseSync;
   private dbPath: string;
@@ -131,9 +152,31 @@ export class MemoryEngine {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS tasks (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        completed INTEGER NOT NULL DEFAULT 0,
+        priority TEXT NOT NULL DEFAULT 'STANDARD',
+        sector TEXT NOT NULL DEFAULT 'Core Engine',
+        due_time TEXT NOT NULL DEFAULT '18:00',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS reminders (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        datetime TEXT NOT NULL DEFAULT '',
+        recurrence TEXT NOT NULL DEFAULT 'ONCE',
+        note TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'PENDING',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
     `;
     this.db.exec(schemaSql);
     this.migrateSchema();
+    this.seedDefaultDataIfEmpty();
 
     const indexesSql = `
       CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
@@ -142,6 +185,8 @@ export class MemoryEngine {
       CREATE INDEX IF NOT EXISTS idx_memory_items_type ON memory_items(type);
       CREATE INDEX IF NOT EXISTS idx_memory_items_source ON memory_items(source);
       CREATE INDEX IF NOT EXISTS idx_memory_items_sensitivity ON memory_items(sensitivity);
+      CREATE INDEX IF NOT EXISTS idx_tasks_completed ON tasks(completed);
+      CREATE INDEX IF NOT EXISTS idx_reminders_status ON reminders(status);
     `;
     this.db.exec(indexesSql);
   }
@@ -456,12 +501,177 @@ export class MemoryEngine {
     };
   }
 
+  // --- Persistent Tasks & Reminders Storage ---
+
+  private seedDefaultDataIfEmpty(): void {
+    try {
+      const taskCount = (this.db.prepare('SELECT COUNT(*) as c FROM tasks').get() as any)?.c || 0;
+      if (taskCount === 0) {
+        const seedTasks = [
+          { id: 'task-1', title: 'Initialize Golden Space AI Core telemetry', completed: 1, priority: 'CRITICAL', sector: 'Core Engine', due_time: '09:00' },
+          { id: 'task-2', title: 'Calibrate multilingual Hindi/English speech synthesis', completed: 0, priority: 'ELEVATED', sector: 'Voice Neural', due_time: '14:30' },
+          { id: 'task-3', title: 'Synchronize 3D Humanoid IK Avatar with gesture tracking', completed: 0, priority: 'STANDARD', sector: 'Avatar 3D', due_time: '17:00' },
+          { id: 'task-4', title: 'Inspect local SQLite database integrity & airgap shields', completed: 1, priority: 'CRITICAL', sector: 'Security', due_time: '11:15' },
+        ];
+        const stmt = this.db.prepare(`
+          INSERT INTO tasks (id, title, completed, priority, sector, due_time)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `);
+        for (const t of seedTasks) {
+          stmt.run(t.id, t.title, t.completed, t.priority, t.sector, t.due_time);
+        }
+      }
+
+      const reminderCount = (this.db.prepare('SELECT COUNT(*) as c FROM reminders').get() as any)?.c || 0;
+      if (reminderCount === 0) {
+        const seedReminders = [
+          { id: 'rem-1', title: 'Deep pulse system diagnostic check', datetime: 'Tomorrow at 10:00 AM', recurrence: 'DAILY', note: 'Verify thermal vitals and airgap invariants', status: 'PENDING' },
+          { id: 'rem-2', title: 'Review YouTube audio cache and memory indexes', datetime: 'Friday at 18:00', recurrence: 'WEEKLY', note: 'Optimize disk storage and trim vector caches', status: 'PENDING' },
+        ];
+        const stmt = this.db.prepare(`
+          INSERT INTO reminders (id, title, datetime, recurrence, note, status)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `);
+        for (const r of seedReminders) {
+          stmt.run(r.id, r.title, r.datetime, r.recurrence, r.note, r.status);
+        }
+      }
+    } catch {
+      // Best-effort initial seeding
+    }
+  }
+
+  public listTasks(): TaskRecord[] {
+    const rows = this.db.prepare(`
+      SELECT id, title, completed, priority, sector, due_time as dueTime, created_at as createdAt, updated_at as updatedAt
+      FROM tasks
+      ORDER BY completed ASC, created_at DESC
+    `).all() as any[];
+
+    return rows.map((r) => ({
+      ...r,
+      completed: Boolean(r.completed),
+    }));
+  }
+
+  public createTask(input: Partial<TaskRecord>): TaskRecord {
+    const id = input.id || `task-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const title = (input.title || 'Untitled Directive').trim();
+    const completed = input.completed ? 1 : 0;
+    const priority = input.priority || 'STANDARD';
+    const sector = input.sector || 'Core Engine';
+    const dueTime = input.dueTime || '18:00';
+
+    this.db.prepare(`
+      INSERT INTO tasks (id, title, completed, priority, sector, due_time)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, title, completed, priority, sector, dueTime);
+
+    const created = this.db.prepare(`
+      SELECT id, title, completed, priority, sector, due_time as dueTime, created_at as createdAt, updated_at as updatedAt
+      FROM tasks WHERE id = ?
+    `).get(id) as any;
+
+    return { ...created, completed: Boolean(created.completed) };
+  }
+
+  public updateTask(id: string, updates: Partial<TaskRecord>): TaskRecord | null {
+    const existing = this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as any;
+    if (!existing) return null;
+
+    const newTitle = updates.title !== undefined ? updates.title.trim() : existing.title;
+    const newCompleted = updates.completed !== undefined ? (updates.completed ? 1 : 0) : existing.completed;
+    const newPriority = updates.priority !== undefined ? updates.priority : existing.priority;
+    const newSector = updates.sector !== undefined ? updates.sector : existing.sector;
+    const newDueTime = updates.dueTime !== undefined ? updates.dueTime : existing.due_time;
+
+    this.db.prepare(`
+      UPDATE tasks
+      SET title = ?, completed = ?, priority = ?, sector = ?, due_time = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(newTitle, newCompleted, newPriority, newSector, newDueTime, id);
+
+    const updated = this.db.prepare(`
+      SELECT id, title, completed, priority, sector, due_time as dueTime, created_at as createdAt, updated_at as updatedAt
+      FROM tasks WHERE id = ?
+    `).get(id) as any;
+
+    return { ...updated, completed: Boolean(updated.completed) };
+  }
+
+  public deleteTask(id: string): boolean {
+    const res = this.db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
+    return Number(res.changes ?? 0) > 0;
+  }
+
+  public listReminders(): ReminderRecord[] {
+    const rows = this.db.prepare(`
+      SELECT id, title, datetime, recurrence, note, status, created_at as createdAt
+      FROM reminders
+      ORDER BY created_at DESC
+    `).all() as any[];
+
+    return rows;
+  }
+
+  public createReminder(input: Partial<ReminderRecord>): ReminderRecord {
+    const id = input.id || `rem-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const title = (input.title || 'Untitled Reminder').trim();
+    const datetime = input.datetime || 'Today';
+    const recurrence = input.recurrence || 'ONCE';
+    const note = input.note || '';
+    const status = input.status || 'PENDING';
+
+    this.db.prepare(`
+      INSERT INTO reminders (id, title, datetime, recurrence, note, status)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, title, datetime, recurrence, note, status);
+
+    const created = this.db.prepare(`
+      SELECT id, title, datetime, recurrence, note, status, created_at as createdAt
+      FROM reminders WHERE id = ?
+    `).get(id) as any;
+
+    return created;
+  }
+
+  public updateReminder(id: string, updates: Partial<ReminderRecord>): ReminderRecord | null {
+    const existing = this.db.prepare('SELECT * FROM reminders WHERE id = ?').get(id) as any;
+    if (!existing) return null;
+
+    const newTitle = updates.title !== undefined ? updates.title.trim() : existing.title;
+    const newDatetime = updates.datetime !== undefined ? updates.datetime : existing.datetime;
+    const newRecurrence = updates.recurrence !== undefined ? updates.recurrence : existing.recurrence;
+    const newNote = updates.note !== undefined ? updates.note : existing.note;
+    const newStatus = updates.status !== undefined ? updates.status : existing.status;
+
+    this.db.prepare(`
+      UPDATE reminders
+      SET title = ?, datetime = ?, recurrence = ?, note = ?, status = ?
+      WHERE id = ?
+    `).run(newTitle, newDatetime, newRecurrence, newNote, newStatus, id);
+
+    const updated = this.db.prepare(`
+      SELECT id, title, datetime, recurrence, note, status, created_at as createdAt
+      FROM reminders WHERE id = ?
+    `).get(id) as any;
+
+    return updated;
+  }
+
+  public deleteReminder(id: string): boolean {
+    const res = this.db.prepare('DELETE FROM reminders WHERE id = ?').run(id);
+    return Number(res.changes ?? 0) > 0;
+  }
+
   public clearAll(): void {
     this.db.exec(`
       DELETE FROM messages;
       DELETE FROM conversations;
       DELETE FROM memory_items;
       DELETE FROM user_preferences;
+      DELETE FROM tasks;
+      DELETE FROM reminders;
     `);
   }
 }

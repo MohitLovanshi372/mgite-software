@@ -21,6 +21,7 @@ import { JarvisCommandBar } from './components/Layout/JarvisCommandBar.tsx';
 import { CommandCenter } from './pages/CommandCenter.tsx';
 import { ChatView } from './pages/ChatView.tsx';
 import { TasksPage } from './pages/Tasks.tsx';
+import { CalendarPage } from './pages/Calendar.tsx';
 import { MemoryPage } from './pages/Memory.tsx';
 import { NotificationsPage } from './pages/Notifications.tsx';
 import { GLBStudioPage } from './pages/GLBStudioPage.tsx';
@@ -63,13 +64,13 @@ export default function App() {
   );
   const [currentTaskTitle, setCurrentTaskTitle] = useState<string>('System Standby');
 
-  // Space Star & Neural Wave Theme State with Local Storage & 3-Slot History
+  // Space Star & Golden Space Theme State
   const [spaceThemeEnabled, setSpaceThemeEnabled] = useState<boolean>(true);
   const [currentSpaceTheme, setCurrentSpaceTheme] = useState<SpaceThemeId>(() => {
     const saved = localStorage.getItem('ultron_space_theme_active');
-    return (saved as SpaceThemeId) && SPACE_THEME_CATALOG[saved as SpaceThemeId]
+    return (saved as SpaceThemeId) && SPACE_THEME_CATALOG[saved as SpaceThemeId] && saved !== 'CRIMSON_NEBULA'
       ? (saved as SpaceThemeId)
-      : DEFAULT_SPACE_THEME;
+      : 'SOLAR_GOLD';
   });
 
   const [spaceThemeHistory, setSpaceThemeHistory] = useState<SpaceThemeId[]>(() => {
@@ -112,6 +113,7 @@ export default function App() {
   const handleToggleListeningRef = useRef<((forceState?: boolean) => void) | null>(null);
 
   const speechTimeoutRef = useRef<any>(null);
+  const conversationIdRef = useRef<string | null>(null);
 
   const handleStateChange = useCallback((newState: AIStateMode) => {
     setAvatarState(newState);
@@ -140,323 +142,176 @@ export default function App() {
     []
   );
 
-  // Autonomous Execution Cycle
+  // Stop current speech playback and return core to idle
+  const handleStopSpeaking = useCallback(() => {
+    if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
+    ultronVoice.stop();
+    handleStateChange('IDLE');
+    setCurrentTaskTitle('System Standby');
+    dispatchNotification('Speech playback interrupted.', 'JARVIS AUDIO');
+  }, [handleStateChange, dispatchNotification]);
+
+  // Real Autonomous Execution Cycle (Mic/Text -> Gemini Backend AI -> Response -> Fish Audio TTS -> Audio Playback)
   const triggerAICycle = useCallback(
-    (commandText: string) => {
+    async (commandText: string) => {
+      const trimmed = commandText.trim();
+      if (!trimmed) return;
+
       if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
+      ultronVoice.stop();
 
-      // 1. LISTENING
-      handleStateChange('LISTENING');
-      setIsListening(true);
-      setInterimTranscript(commandText);
+      const lowerCmd = trimmed.toLowerCase();
 
-      // Track active task title
-      const lowerCmd = commandText.toLowerCase();
-      if (lowerCmd.includes('youtube')) {
-        setCurrentTaskTitle('Searching YouTube... Arijit Singh');
-      } else if (lowerCmd.includes('status')) {
-        setCurrentTaskTitle('Checking System Status...');
-      } else if (lowerCmd.includes('yaad') || lowerCmd.includes('remind')) {
-        setCurrentTaskTitle('Creating Reminder Directive...');
-      } else if (lowerCmd.includes('note')) {
-        setCurrentTaskTitle('Recording Encrypted Note...');
-      } else {
-        setCurrentTaskTitle(`Processing: ${commandText.slice(0, 24)}...`);
+      // Instant UI/Media interceptors for responsive tactile feedback
+      if (lowerCmd.includes('change video') || lowerCmd.includes('next video') || lowerCmd.includes('next song') || lowerCmd.includes('agla video') || lowerCmd.includes('dusra gana')) {
+        const nextVideo = youtubePlayerService.changeVideo('next');
+        setActivePage('youtube_media');
+        setLastAssistantMessage(`Playing next video: ${nextVideo.title}`);
+        ultronVoice.speak(`Agla video play kar rahi hoon: ${nextVideo.title}`);
+        return;
+      }
+      if (lowerCmd.includes('previous video') || lowerCmd.includes('pichla video') || lowerCmd.includes('previous song') || lowerCmd.includes('pichla gana')) {
+        const prevVideo = youtubePlayerService.changeVideo('prev');
+        setActivePage('youtube_media');
+        setLastAssistantMessage(`Playing previous video: ${prevVideo.title}`);
+        ultronVoice.speak(`Pichla video play kar rahi hoon: ${prevVideo.title}`);
+        return;
+      }
+      if (lowerCmd.includes('pause video') || lowerCmd.includes('video roko') || lowerCmd.includes('video pause')) {
+        youtubePlayerService.pause();
+        setLastAssistantMessage('Video paused.');
+        ultronVoice.speak('Video pause kar di gayi hai.');
+        return;
+      }
+      if (lowerCmd.includes('resume video') || lowerCmd.includes('video chalu') || lowerCmd.includes('resume karo')) {
+        youtubePlayerService.play();
+        setLastAssistantMessage('Video resumed.');
+        ultronVoice.speak('Video resume kar di gayi hai.');
+        return;
+      }
+      if (lowerCmd.includes('download video') || lowerCmd.includes('download song') || lowerCmd.includes('video download')) {
+        const format = lowerCmd.includes('audio') || lowerCmd.includes('mp3') ? 'MP3' : 'MP4';
+        const dlTask = youtubePlayerService.download(format);
+        setActivePage('youtube_media');
+        setLastAssistantMessage(`Downloading ${dlTask.title} (${format})`);
+        ultronVoice.speak(`Main ${dlTask.title} ka ${format} download shuru kar rahi hoon.`);
+        return;
+      }
+      if (lowerCmd.includes('open youtube') || lowerCmd.includes('youtube kholo')) {
+        safeBrowserControl.openYouTube();
+        setActivePage('youtube_media');
+        setLastAssistantMessage('Opening YouTube media center.');
+        ultronVoice.speak('YouTube open kar rahi hoon.');
+        return;
+      }
+      if (lowerCmd.includes('play music') || lowerCmd.includes('play video') || lowerCmd.includes('gaana chalao') || lowerCmd.includes('video chalao')) {
+        const query = trimmed
+          .replace(/^(hey\s+)?(jarvis|ultron|जार्विस)[,\s]*/i, '')
+          .replace(/\b(play|video|music|chalao|gaana|gana|on youtube|bajaao|bajao)\b/gi, '')
+          .trim();
+        if (query) {
+          const searched = youtubePlayerService.searchAndPlay(query);
+          setActivePage('youtube_media');
+          setLastAssistantMessage(`Playing: ${searched.title}`);
+          ultronVoice.speak(`${searched.title} play kar rahi hoon.`);
+          return;
+        }
+      }
+      if (lowerCmd.includes('avatar smile') || lowerCmd.includes('smile karo')) {
+        setControlledEmote('happy');
+      } else if (lowerCmd.includes('avatar nod') || lowerCmd.includes('nod karo')) {
+        setControlledEmote('friendly');
+      } else if (lowerCmd.includes('avatar think') || lowerCmd.includes('socho')) {
+        setControlledEmote('thinking');
+      } else if (lowerCmd.includes('avatar serious')) {
+        setControlledEmote('serious');
+      } else if (lowerCmd.includes('avatar excited')) {
+        setControlledEmote('excited');
+      } else if (lowerCmd.includes('avatar normal') || lowerCmd.includes('auto emote')) {
+        setControlledEmote(null);
       }
 
-      // Proactive Acknowledgment Engine ("answers before it works" - bridges the tool-writing silence)
-      const proactiveAck = ProactiveAcknowledgmentEngine.generateImmediateAcknowledgment(commandText);
-      if (proactiveAck.isSpoken) {
-        setLastAssistantMessage(proactiveAck.text);
-        ultronVoice.speak(proactiveAck.text);
+      // Quick navigation intents
+      if (lowerCmd.includes('tasks dikhao') || lowerCmd.includes('open tasks') || lowerCmd.includes('aaj kya karna hai')) {
+        setActivePage('tasks');
+      } else if (lowerCmd.includes('reminders') || lowerCmd.includes('calendar') || lowerCmd.includes('yaad dilana') || lowerCmd.includes('remind me')) {
+        setActivePage('calendar');
+      } else if (lowerCmd.includes('glb studio') || lowerCmd.includes('3d model') || lowerCmd.includes('avatar mode')) {
+        setActivePage('glb_studio');
       }
 
-      // 2. THINKING (1.2s)
-      speechTimeoutRef.current = setTimeout(() => {
-        handleStateChange('THINKING');
-        setIsListening(false);
-        setInterimTranscript('');
+      // 1. Transition state to THINKING
+      handleStateChange('THINKING');
+      setIsListening(false);
+      setInterimTranscript('');
+      setCurrentTaskTitle(`Gemini Brain: ${trimmed.slice(0, 24)}...`);
 
-        // 3. EXECUTING (1.4s)
-        speechTimeoutRef.current = setTimeout(() => {
-          handleStateChange('EXECUTING');
+      try {
+        // Real Backend Call to Gemini AI Brain
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: trimmed,
+            conversation_id: conversationIdRef.current || undefined,
+          }),
+        });
 
-          // 4. SPEAKING (1.3s)
-          speechTimeoutRef.current = setTimeout(() => {
-            handleStateChange('SPEAKING');
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
 
-            const lowerCmd = commandText.toLowerCase();
-            const parsedHinglish = parseHinglishCommand(commandText);
-            const intentResult = IntentDetector.detectIntent(commandText);
-            let customResponse: string | null = null;
+        const data = await response.json();
+        if (data.conversationId) {
+          conversationIdRef.current = data.conversationId;
+        }
 
-            // Dictionary-based Hindi & Hinglish Command Evaluation
-            if (parsedHinglish.target === 'light' && parsedHinglish.action === 'turn_on') {
-              customResponse = 'Light on kar di gayi hai. Optical illumination systems online and fully energized.';
-            } else if (parsedHinglish.target === 'light' && parsedHinglish.action === 'turn_off') {
-              customResponse = 'Light band kar di gayi hai. Stealth illumination engaged.';
-            } else if (
-              lowerCmd.includes('mera system status') ||
-              lowerCmd.includes('system status batao') ||
-              lowerCmd.includes('सिस्टम स्टेटस बताओ') ||
-              parsedHinglish.target === 'system_status' ||
-              parsedHinglish.action === 'status' ||
-              lowerCmd.includes('system status dikhao') ||
-              lowerCmd.includes('status dikhao') ||
-              lowerCmd.includes('सिस्टम स्टेटस दिखाओ')
-            ) {
-              setActivePage('command_center');
-              customResponse = 'Bilkul, main aapke system ka status check karti hoon.';
-            } else if (
-              lowerCmd.includes('yaad dilana') ||
-              lowerCmd.includes('yaad dila') ||
-              lowerCmd.includes('याद दिलाना') ||
-              lowerCmd.includes('remind me')
-            ) {
-              if (lowerCmd.includes('10 baje') || lowerCmd.includes('10:00')) {
-                customResponse = 'Bilkul, kal 10 baje main aapko yaad dilaungi.';
-              } else {
-                customResponse = 'Bilkul, main aapko samay par yaad dilaungi.';
+        const aiResponseText: string = data.response || 'Affirmative. Directive processed.';
+        setLastAssistantMessage(aiResponseText);
+        setCurrentTaskTitle(`Speaking: ${aiResponseText.slice(0, 24)}...`);
+
+        if (data.emotion) {
+          setControlledEmote(data.emotion);
+        }
+
+        // 2. Transition state to SPEAKING
+        handleStateChange('SPEAKING');
+
+        // 3. Fish Audio TTS -> Audio Playback & Audio-reactive Core Waveform
+        ultronVoice.speak(aiResponseText, {
+          onEnd: () => {
+            handleStateChange('SUCCESS');
+            dispatchNotification(
+              `Directive completed: "${trimmed.slice(0, 36)}"`,
+              'JARVIS BRAIN'
+            );
+            speechTimeoutRef.current = setTimeout(() => {
+              handleStateChange('IDLE');
+              setCurrentTaskTitle('System Standby');
+              if (isAutoSpeechActiveRef.current && handleToggleListeningRef.current) {
+                setTimeout(() => {
+                  handleToggleListeningRef.current?.(true);
+                }, 400);
               }
-            } else if (
-              lowerCmd.includes('kya haal hai') ||
-              lowerCmd.includes('kya chal raha hai') ||
-              lowerCmd.includes('क्या हाल है')
-            ) {
-              if (/[\u0900-\u097F]/.test(commandText)) {
-                customResponse = 'सब ठीक है। आप बताइए, मैं आपकी क्या सहायता कर सकती हूँ?';
-              } else {
-                customResponse = 'Main badhiya hoon. Aap bataiye, main aapki kya madad kar sakti hoon?';
-              }
-            } else if (
-              lowerCmd.includes('aaj kya karna hai') ||
-              lowerCmd.includes('aaj ka kya plan hai') ||
-              lowerCmd.includes('आज क्या करना है')
-            ) {
-              customResponse = 'Aaj ke schedule me aapke core system checks aur task operations ready hain.';
-            // AVATAR EMOTE VOICE CONTROLS DURING CONVERSATION
-            } else if (
-              lowerCmd.includes('avatar smile') ||
-              lowerCmd.includes('smile karo') ||
-              lowerCmd.includes('happy emote') ||
-              lowerCmd.includes('be happy') ||
-              lowerCmd.includes('hanso')
-            ) {
-              setControlledEmote('happy');
-              customResponse = 'Main smile kar rahi hoon. Main bohot khush aur ready hoon!';
-            } else if (
-              lowerCmd.includes('avatar think') ||
-              lowerCmd.includes('avatar socho') ||
-              lowerCmd.includes('thinking emote') ||
-              lowerCmd.includes('socho')
-            ) {
-              setControlledEmote('thinking');
-              customResponse = 'Main is directive ke baare mein soch rahi hoon.';
-            } else if (
-              lowerCmd.includes('avatar nod') ||
-              lowerCmd.includes('nod karo') ||
-              lowerCmd.includes('agree emote')
-            ) {
-              setControlledEmote('friendly');
-              customResponse = 'Main aapse sahmat hoon aur nod kar rahi hoon.';
-            } else if (
-              lowerCmd.includes('avatar wave') ||
-              lowerCmd.includes('wave karo') ||
-              lowerCmd.includes('hello bolo')
-            ) {
-              setControlledEmote('friendly');
-              customResponse = 'Namaste! Main aapka swagat karti hoon.';
-            } else if (
-              lowerCmd.includes('avatar serious') ||
-              lowerCmd.includes('serious ho jao') ||
-              lowerCmd.includes('serious mode')
-            ) {
-              setControlledEmote('serious');
-              customResponse = 'Main serious mode activate kar rahi hoon.';
-            } else if (
-              lowerCmd.includes('avatar excited') ||
-              lowerCmd.includes('excited ho jao')
-            ) {
-              setControlledEmote('excited');
-              customResponse = 'Main bohot excited aur energized hoon!';
-            } else if (
-              lowerCmd.includes('avatar normal') ||
-              lowerCmd.includes('auto emote') ||
-              lowerCmd.includes('neutral emote')
-            ) {
-              setControlledEmote(null);
-              customResponse = 'Main auto emote mode par switch kar chuki hoon.';
-
-            // YOUTUBE & MUSIC VIDEO CONTROLS (Auto Play, Change Video, Download)
-            } else if (
-              lowerCmd.includes('change video') ||
-              lowerCmd.includes('next video') ||
-              lowerCmd.includes('video change') ||
-              lowerCmd.includes('dusra video') ||
-              lowerCmd.includes('agla video') ||
-              lowerCmd.includes('video badlo') ||
-              lowerCmd.includes('next song') ||
-              lowerCmd.includes('agla gana') ||
-              lowerCmd.includes('dusra gana')
-            ) {
-              const nextVideo = youtubePlayerService.changeVideo('next');
-              setActivePage('youtube_media');
-              customResponse = `Main video change kar rahi hoon. Ab ${nextVideo.title} play ho raha hai.`;
-            } else if (
-              lowerCmd.includes('previous video') ||
-              lowerCmd.includes('pichla video') ||
-              lowerCmd.includes('previous song') ||
-              lowerCmd.includes('pichla gana')
-            ) {
-              const prevVideo = youtubePlayerService.changeVideo('prev');
-              setActivePage('youtube_media');
-              customResponse = `Main pichla video play kar rahi hoon: ${prevVideo.title}.`;
-            } else if (
-              lowerCmd.includes('download video') ||
-              lowerCmd.includes('video download') ||
-              lowerCmd.includes('download song') ||
-              lowerCmd.includes('gana download') ||
-              lowerCmd.includes('download audio') ||
-              lowerCmd.includes('download mp4') ||
-              lowerCmd.includes('download mp3')
-            ) {
-              const format = lowerCmd.includes('audio') || lowerCmd.includes('mp3') ? 'MP3' : 'MP4';
-              const dlTask = youtubePlayerService.download(format);
-              setActivePage('youtube_media');
-              customResponse = `Main ${dlTask.title} ka ${format} download shuru kar rahi hoon.`;
-            } else if (
-              lowerCmd.includes('pause video') ||
-              lowerCmd.includes('video pause') ||
-              lowerCmd.includes('video roko')
-            ) {
-              youtubePlayerService.pause();
-              customResponse = 'Main video pause kar rahi hoon.';
-            } else if (
-              lowerCmd.includes('resume video') ||
-              lowerCmd.includes('video chalu') ||
-              lowerCmd.includes('resume karo')
-            ) {
-              youtubePlayerService.play();
-              customResponse = 'Main video resume kar rahi hoon.';
-            } else if (
-              parsedHinglish.intent === 'open_youtube' ||
-              intentResult.intent === 'open_youtube' ||
-              lowerCmd.includes('open youtube') ||
-              lowerCmd.includes('youtube kholo')
-            ) {
-              safeBrowserControl.openYouTube();
-              setActivePage('youtube_media');
-              customResponse = 'YouTube open kar rahi hoon.';
-            } else if (
-              parsedHinglish.intent === 'stop_music' ||
-              intentResult.intent === 'stop_music'
-            ) {
-              cyberMusic.stop();
-              youtubePlayerService.pause();
-              safeBrowserControl.stopMusic();
-              customResponse = 'Music band kar di gayi hai.';
-            } else if (
-              parsedHinglish.intent === 'play_music' ||
-              intentResult.intent === 'play_music' ||
-              lowerCmd.includes('play music video') ||
-              lowerCmd.includes('play video') ||
-              lowerCmd.includes('video chalao')
-            ) {
-              const query = commandText
-                .replace(/^(hey\s+)?(jarvis|ultron|जार्विस)[,\s]*/i, '')
-                .replace(/\b(play|video|music|chalao|gaana|gana|on youtube|bajaao|bajao)\b/gi, '')
-                .trim();
-              if (query) {
-                const searched = youtubePlayerService.searchAndPlay(query);
-                setActivePage('youtube_media');
-                customResponse = `Sure, ${searched.title} search karke play kar rahi hoon.`;
-              } else {
-                youtubePlayerService.play();
-                safeBrowserControl.playMusic();
-                setActivePage('youtube_media');
-                customResponse = 'YouTube open kar rahi hoon.';
-              }
-            } else if (
-              parsedHinglish.intent === 'search_youtube' ||
-              intentResult.intent === 'search_youtube'
-            ) {
-              const query =
-                parsedHinglish.query ||
-                intentResult.query ||
-                intentResult.entities?.query ||
-                commandText
-                  .replace(/^(hey\s+)?(jarvis|ultron|जार्विस)[,\s]*/i, '')
-                  .replace(/\b(play|search|chalao|on youtube|ke songs|ke gaane)\b/gi, '')
-                  .trim();
-              safeBrowserControl.searchYouTube(query);
-              youtubePlayerService.searchAndPlay(query);
-              setActivePage('youtube_media');
-              customResponse = `Sure, ${query} search kar rahi hoon.`;
-            } else if (lowerCmd.includes('google') || lowerCmd.includes('search')) {
-              const query = commandText.replace(/google|search|for/gi, '').trim() || 'Solar System astronomy telemetry';
-              customResponse = `Querying astronomical ephemeris and Google index for "${query}". Celestial coordinates synchronized.`;
-              if (lowerCmd.includes('open google') || lowerCmd.includes('open search')) {
-                window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, '_blank', 'noopener,noreferrer');
-              }
-            } else if (lowerCmd.includes('model') || lowerCmd.includes('glb') || lowerCmd.includes('3d') || lowerCmd.includes('robot') || lowerCmd.includes('studio')) {
-              setActivePage('glb_studio');
-              customResponse = `Navigating to 3D GLB Model Studio. Hardware PBR shaders initialized.`;
-            } else if (lowerCmd.includes('galaxy') || lowerCmd.includes('stars') || lowerCmd.includes('cosmos')) {
-              setActivePage('galaxy_view');
-              customResponse = `Navigating to Ultron 3D Galaxy Viewport. Accretion matrix online.`;
-            } else if (lowerCmd.includes('command') || lowerCmd.includes('matrix') || lowerCmd.includes('overview') || lowerCmd.includes('center')) {
-              setActivePage('command_center');
-              customResponse = `Navigating to Command Matrix HUD. Real-time telemetry feeds synchronized.`;
-            } else if (lowerCmd.includes('intel') || lowerCmd.includes('gesture') || lowerCmd.includes('cognitive')) {
-              setActivePage('intelligence');
-              customResponse = `Navigating to Cognitive Intelligence & Neural Directives.`;
-            } else if (lowerCmd.includes('system') || lowerCmd.includes('setting') || lowerCmd.includes('hardware') || lowerCmd.includes('control')) {
-              setActivePage('system_control');
-              customResponse = `Navigating to System & Hardware Control Center. Registers calibrated.`;
-            }
-
-            const defaultResponses = [
-              `Directive recognized: "${commandText}". Ultron cybernetic matrix calibrated.`,
-              `Affirmative. "${commandText}" executed. System telemetry locked and nominal.`,
-              `Cognitive synthesis complete for: "${commandText}". Neural vectors indexed.`,
-              `Ultron protocol finalized. Autonomous parameters updated.`,
-            ];
-            const response = customResponse || defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
-            setLastAssistantMessage(response);
-
-            // Trigger Ultron Deep Voice Speech Synthesis
-            ultronVoice.speak(response, {
-              onEnd: () => {
-                handleStateChange('SUCCESS');
-                dispatchNotification(
-                  `Directive executed: "${commandText.slice(0, 42)}"`,
-                  'DIRECTIVE ENGINE'
-                );
-                speechTimeoutRef.current = setTimeout(() => {
-                  handleStateChange('IDLE');
-                  // Continuous conversational loop in auto-speech mode
-                  if (isAutoSpeechActiveRef.current && handleToggleListeningRef.current) {
-                    setTimeout(() => {
-                      handleToggleListeningRef.current?.(true);
-                    }, 400);
-                  }
-                }, 1800);
-              },
-              onError: () => {
-                handleStateChange('SUCCESS');
-                speechTimeoutRef.current = setTimeout(() => {
-                  handleStateChange('IDLE');
-                  if (isAutoSpeechActiveRef.current && handleToggleListeningRef.current) {
-                    setTimeout(() => {
-                      handleToggleListeningRef.current?.(true);
-                    }, 400);
-                  }
-                }, 1800);
-              },
-            });
-          }, 1300);
-        }, 1400);
-      }, 1200);
+            }, 1200);
+          },
+          onError: () => {
+            handleStateChange('SUCCESS');
+            speechTimeoutRef.current = setTimeout(() => {
+              handleStateChange('IDLE');
+              setCurrentTaskTitle('System Standby');
+            }, 1000);
+          },
+        });
+      } catch (err: any) {
+        const errorMsg = `Neural Core Error: ${err.message || 'Unable to communicate with AI provider'}`;
+        setLastAssistantMessage(errorMsg);
+        dispatchNotification(errorMsg, 'AI ERROR', true);
+        handleStateChange('IDLE');
+        setCurrentTaskTitle('System Standby');
+        ultronVoice.speak('AI service temporarily unreachable. Standing by.');
+      }
     },
     [handleStateChange, dispatchNotification]
   );
@@ -620,6 +475,8 @@ export default function App() {
         return <SystemControlPage onNavigate={(page) => setActivePage(page)} />;
       case 'tasks':
         return <TasksPage />;
+      case 'calendar':
+        return <CalendarPage />;
       case 'memory':
         return <MemoryPage />;
       case 'tools':
@@ -706,14 +563,14 @@ export default function App() {
   return (
     <div
       id="jarvis-desktop-app"
-      className="flex flex-col h-screen w-screen overflow-hidden bg-[#040814] text-slate-100 font-sans select-none relative"
+      className="flex flex-col h-screen w-screen overflow-hidden bg-[#030712] text-[#E8EAF0] font-sans select-none relative"
     >
-      {/* 0. Immersive Celestial Space Star Field & Chromatic Neural Network Waves Backdrop */}
+      {/* 0. Immersive Golden Space Starfield Backdrop */}
       {spaceThemeEnabled && (
         <SpaceCanvasStarfield
           state={avatarState}
           theme={currentSpaceTheme}
-          enableInteractiveWaves={true}
+          enableInteractiveWaves={false}
         />
       )}
 
@@ -757,6 +614,8 @@ export default function App() {
               onExecute={triggerAICycle}
               isListening={isListening}
               onToggleListening={handleToggleListening}
+              onStop={handleStopSpeaking}
+              isSpeaking={avatarState === 'SPEAKING'}
             />
           </div>
         </main>
@@ -768,7 +627,17 @@ export default function App() {
           geminiConnected={true}
           voiceReady={true}
           ttsReady={true}
-          onQuickAction={handleQuickAction}
+          onVoicePersonaChange={(persona) => ultronVoice.setVoicePersona(persona)}
+          onLanguageChange={(lang) => ultronVoice.setLanguageMode(lang)}
+          onQuickAction={(actionKey) => {
+            if (actionKey === 'open_tasks') {
+              setActivePage('tasks');
+            } else if (actionKey === 'create_reminder') {
+              setActivePage('calendar');
+            } else {
+              handleQuickAction(actionKey as any);
+            }
+          }}
         />
       </div>
     </div>
