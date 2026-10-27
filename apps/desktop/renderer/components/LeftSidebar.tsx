@@ -49,20 +49,22 @@ export type SidebarNavId =
   | 'architecture'
   | 'settings';
 
+interface LeftSidebarBadgeCounts {
+  tasks?: number;
+  notifications?: number;
+  memory?: number;
+}
+
 interface LeftSidebarProps {
   activeId: SidebarNavId;
   onNavigate: (id: SidebarNavId) => void;
-  badgeCounts?: {
-    tasks?: number;
-    notifications?: number;
-    memory?: number;
-  };
+  badgeCounts?: LeftSidebarBadgeCounts;
 }
 
 export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   activeId,
   onNavigate,
-  badgeCounts = {},
+  badgeCounts = {} as LeftSidebarBadgeCounts,
 }) => {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -166,9 +168,8 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   return (
     <aside
       id="jarvis-left-sidebar"
-      className={`relative z-20 flex flex-col h-full bg-[#06080e]/95 backdrop-blur-xl border-r border-cyan-500/15 transition-all duration-300 select-none ${
-        collapsed ? 'w-14 sm:w-16' : 'w-52 lg:w-56'
-      }`}
+      className={`relative z-20 flex flex-col h-full bg-[#06080e]/95 backdrop-blur-xl border-r border-cyan-500/15 transition-all duration-300 select-none ${collapsed ? 'w-14 sm:w-16' : 'w-52 lg:w-56'
+        }`}
       aria-label="Navigation Sidebar"
     >
       {/* Sidebar Header Section */}
@@ -203,11 +204,10 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
               id={`nav-item-${item.id}`}
               onClick={() => onNavigate(item.id)}
               title={`${item.label} — ${item.hint}`}
-              className={`relative group w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-mono transition-all cursor-pointer ${
-                isActive
+              className={`relative group w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-mono transition-all cursor-pointer ${isActive
                   ? 'bg-cyan-950/50 text-cyan-200 border border-cyan-500/40 shadow-[0_0_15px_rgba(6,182,212,0.15)] font-semibold'
                   : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900/80 border border-transparent hover:border-slate-800'
-              }`}
+                }`}
             >
               {/* Active cyan edge indicator */}
               {isActive && (
@@ -216,9 +216,8 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
 
               {/* Icon */}
               <Icon
-                className={`w-4 h-4 shrink-0 transition-colors ${
-                  isActive ? 'text-cyan-400' : 'text-slate-400 group-hover:text-cyan-300'
-                }`}
+                className={`w-4 h-4 shrink-0 transition-colors ${isActive ? 'text-cyan-400' : 'text-slate-400 group-hover:text-cyan-300'
+                  }`}
               />
 
               {/* Label */}
@@ -229,11 +228,10 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
               {/* Optional Badge */}
               {item.badge !== undefined && item.badge > 0 && (
                 <span
-                  className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
-                    isActive
+                  className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono font-bold ${isActive
                       ? 'bg-cyan-400 text-slate-950'
                       : 'bg-slate-800 text-cyan-300 border border-cyan-500/30'
-                  }`}
+                    }`}
                 >
                   {item.badge}
                 </span>

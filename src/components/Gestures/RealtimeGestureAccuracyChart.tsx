@@ -82,11 +82,11 @@ export const RealtimeGestureAccuracyChart: React.FC<RealtimeGestureAccuracyChart
       };
     }
 
-    const tracked = data.filter((d) => d.isTracking);
-    const pool = tracked.length > 0 ? tracked : data;
-    const sumAcc = pool.reduce((acc, d) => acc + d.accuracy, 0);
+    const tracked = data.filter((d: GestureAccuracyPoint) => d.isTracking);
+    const pool: GestureAccuracyPoint[] = tracked.length > 0 ? tracked : data;
+    const sumAcc = pool.reduce((acc, d: GestureAccuracyPoint) => acc + d.accuracy, 0);
     const avgAcc = Math.round((sumAcc / pool.length) * 100);
-    const peakAcc = Math.round(d3.max(pool, (d) => d.accuracy * 100) || 0);
+    const peakAcc = Math.round(d3.max(pool, (d: GestureAccuracyPoint) => d.accuracy * 100) || 0);
 
     const latest = data[data.length - 1];
     const currClarity = Math.round((latest?.clarity || 0) * 100);
@@ -297,9 +297,9 @@ export const RealtimeGestureAccuracyChart: React.FC<RealtimeGestureAccuracyChart
       .attr('fill', '#a1a1aa');
 
     // Data filtering for last 60s
-    const filtered = data
-      .filter((d) => d.timestamp >= sixtySecsAgo - 2000)
-      .sort((a, b) => a.timestamp - b.timestamp);
+    const filtered: GestureAccuracyPoint[] = data
+      .filter((d: GestureAccuracyPoint) => d.timestamp >= sixtySecsAgo - 2000)
+      .sort((a: GestureAccuracyPoint, b: GestureAccuracyPoint) => a.timestamp - b.timestamp);
 
     if (filtered.length >= 2) {
       // 1. Accuracy Area
@@ -348,21 +348,20 @@ export const RealtimeGestureAccuracyChart: React.FC<RealtimeGestureAccuracyChart
 
       // 4. Highlight dots on recent data samples
       const dots = g
-        .selectAll('.acc-dot')
+        .selectAll<SVGGElement, GestureAccuracyPoint>('.acc-dot')
         .data(filtered.slice(-18))
-        .enter()
-        .append('g')
+        .join('g')
         .attr('class', 'acc-dot');
 
       dots
         .append('circle')
-        .attr('cx', (d) => xScale(new Date(d.timestamp)))
-        .attr('cy', (d) => yScale(d.accuracy * 100))
-        .attr('r', (d, i) => (i === filtered.slice(-18).length - 1 ? 4.5 : 2.5))
-        .attr('fill', (d) => (d.isTracking ? '#ef4444' : '#52525b'))
+        .attr('cx', (d: GestureAccuracyPoint) => xScale(new Date(d.timestamp)))
+        .attr('cy', (d: GestureAccuracyPoint) => yScale(d.accuracy * 100))
+        .attr('r', (_d: GestureAccuracyPoint, i: number) => (i === filtered.slice(-18).length - 1 ? 4.5 : 2.5))
+        .attr('fill', (d: GestureAccuracyPoint) => (d.isTracking ? '#ef4444' : '#52525b'))
         .attr('stroke', '#ffffff')
         .attr('stroke-width', 0.8)
-        .attr('opacity', (d, i) => (i === filtered.slice(-18).length - 1 ? 1 : 0.75));
+        .attr('opacity', (_d: GestureAccuracyPoint, i: number) => (i === filtered.slice(-18).length - 1 ? 1 : 0.75));
 
       // Latest pulsating radar ping ring
       const last = filtered[filtered.length - 1];
@@ -610,8 +609,8 @@ export const RealtimeGestureAccuracyChart: React.FC<RealtimeGestureAccuracyChart
             {stats.currClarity >= 80
               ? 'Optical hand positioning is optimal. Finger contour separation exhibits high signal-to-noise ratio.'
               : stats.currClarity >= 60
-              ? 'Moderate clarity. Maintain adequate lighting and hold fingers steady within the optical center.'
-              : 'Sub-optimal clarity. Ensure high contrast against background and align with the visual teaching guidelines.'}
+                ? 'Moderate clarity. Maintain adequate lighting and hold fingers steady within the optical center.'
+                : 'Sub-optimal clarity. Ensure high contrast against background and align with the visual teaching guidelines.'}
           </span>
         </div>
         <span className="text-zinc-400 shrink-0">WINDOW: 60,000ms</span>

@@ -191,14 +191,15 @@ export const AvatarScene: React.FC<{ className?: string }> = ({ className = '' }
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* React Three Fiber Canvas */}
-      <Canvas
-        camera={{ position: [0, 0, 2.2], fov: 42 }}
-        dpr={settings.quality === 'HIGH' ? [1, 2] : [1, 1.5]}
-        gl={{ antialias: settings.quality !== 'LOW', alpha: true, powerPreference: 'default' }}
-        style={{ width: '100%', height: '100%' }}
-      >
-        <InnerSceneContent settings={settings} onStateUpdate={setActiveState} />
-      </Canvas>
+      <div className="absolute inset-0">
+        <Canvas
+          camera={{ position: [0, 0, 2.2], fov: 42 }}
+          dpr={settings.quality === 'HIGH' ? [1, 2] : [1, 1.5]}
+          gl={{ antialias: settings.quality !== 'LOW', alpha: true, powerPreference: 'default' }}
+        >
+          <InnerSceneContent settings={settings} onStateUpdate={setActiveState} />
+        </Canvas>
+      </div>
 
       {/* Floating State & Emotion HUD Pills */}
       <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between pointer-events-none px-2">
