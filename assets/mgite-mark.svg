@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="360" viewBox="0 0 360 360" role="img" aria-label="MGITE Software neon M monogram">
+<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#071022"/><stop offset="1" stop-color="#1B0F39"/></linearGradient><linearGradient id="accent" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0FE3F9"/><stop offset=".5" stop-color="#478DFF"/><stop offset="1" stop-color="#A06DFF"/></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="5"/></filter></defs>
+<rect x="5" y="5" width="350" height="350" rx="85" fill="url(#bg)" stroke="url(#accent)" stroke-width="5"/>
+<circle cx="180" cy="180" r="132" fill="none" stroke="#234267" stroke-width="2"/>
+<circle cx="180" cy="180" r="112" fill="none" stroke="url(#accent)" stroke-width="5" stroke-dasharray="88 26 42 40 100 30"/>
+<circle cx="180" cy="180" r="94" fill="#07162B" stroke="#0CDEED" stroke-opacity=".22"/>
+<path d="M106 232V131L150 187L181 149L211 187L254 131V232" fill="none" stroke="#23DDFE" stroke-width="32" stroke-linejoin="miter" stroke-linecap="square" opacity=".35" filter="url(#glow)"/>
+<path d="M106 232V131L150 187L181 149L211 187L254 131V232" fill="none" stroke="url(#accent)" stroke-width="17" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="180" cy="43" r="5" fill="#15EAF7"/><circle cx="312" cy="180" r="5" fill="#9B6CFF"/>
+</svg>
