@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Python Cache & Virtual Environments
+__pycache__/
+*.pyc
+venv/
+.venv/
+env/
+
+# Build & Bundles
+dist/
+build/
+coverage/
+
+# Local Logs & Data
+logs/
+*.log
+data/*.db
+data/*.db-journal
+
+# Environment Secrets
+.env
+.env.*
+!.env.example
+
+# OS & Editor Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
