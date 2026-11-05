@@ -47,7 +47,7 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
   isAutoSpeechActive = false,
   onToggleAutoSpeech,
 }) => {
-  const [viewportMode, setViewportMode] = useState<StageViewportMode>('golden_core');
+  const [viewportMode, setViewportMode] = useState<StageViewportMode>('jarvis_avatar');
   const [showOpticalHUD, setShowOpticalHUD] = useState<boolean>(false);
   const [isMediaPlaying, setIsMediaPlaying] = useState<boolean>(youtubePlayerService.getState().isPlaying);
 
@@ -74,27 +74,29 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
         return { label: 'LISTENING', detail: 'Awaiting voice directive in Hindi or English', color: 'text-[#FFD76A]' };
       case 'THINKING':
       case 'EXECUTING':
-        return { label: 'THINKING', detail: 'Processing neural intent with Gemini AI', color: 'text-[#FFD76A]' };
+        return { label: 'THINKING', detail: 'Working on your request', color: 'text-[#FFD76A]' };
       case 'SPEAKING':
-        return { label: 'SPEAKING', detail: 'Synthesizing voice response with Fish Audio', color: 'text-[#F59E0B]' };
+        return { label: 'SPEAKING', detail: 'Your assistant is speaking', color: 'text-[#F59E0B]' };
       case 'SUCCESS':
         return { label: 'COMPLETED', detail: 'Directive executed successfully', color: 'text-[#FFD76A]' };
       case 'SECURITY_ALERT':
         return { label: 'SECURITY ACTIVE', detail: 'Airgap sentinel operational', color: 'text-amber-500' };
       default:
-        return { label: 'IDLE', detail: 'Standing by for directives', color: 'text-[#D4AF37]' };
+        return { label: 'READY', detail: 'Ready when you are', color: 'text-[#D4AF37]' };
     }
   };
 
   const stateInfo = getStateTelemetry();
 
   return (
-    <div className="w-full h-full flex flex-col relative overflow-hidden select-none">
+    <div className="command-center">
+      <div className="overview-heading"><div><span className="section-kicker">YOUR EVERYDAY COMPANION</span><h1>Good to have you here.</h1></div><span className="overview-badge"><Sparkles size={14} />Let’s talk</span></div>
       {/* Subtle top mode toolbar (minimal, non-cluttered golden glassmorphism) */}
-      <div className="absolute top-2 right-4 z-30 flex items-center gap-1.5 bg-[#030712]/75 backdrop-blur-md px-2.5 py-1 rounded-full border border-[#D4AF37]/20 text-xs">
+      <div className="stage-toolbar" role="group" aria-label="Workspace view">
         <button
           type="button"
           onClick={() => setViewportMode('golden_core')}
+          aria-pressed={viewportMode === 'golden_core'}
           className={`px-2.5 py-1 rounded-full text-[11px] font-sans transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
             viewportMode === 'golden_core'
               ? 'bg-gradient-to-r from-[#D4AF37] to-[#FFD76A] text-[#030712] font-semibold shadow-[0_0_12px_rgba(212,175,55,0.4)]'
@@ -108,6 +110,7 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
         <button
           type="button"
           onClick={() => setViewportMode('jarvis_avatar')}
+          aria-pressed={viewportMode === 'jarvis_avatar'}
           className={`px-2.5 py-1 rounded-full text-[11px] font-sans transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
             viewportMode === 'jarvis_avatar'
               ? 'bg-gradient-to-r from-[#D4AF37] to-[#FFD76A] text-[#030712] font-semibold shadow-[0_0_12px_rgba(212,175,55,0.4)]'
@@ -115,12 +118,13 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
           }`}
         >
           <Box className="w-3 h-3" />
-          <span>AVATAR 3D</span>
+          <span>JARVIS</span>
         </button>
 
         <button
           type="button"
           onClick={() => setViewportMode('galaxy_3d')}
+          aria-pressed={viewportMode === 'galaxy_3d'}
           className={`px-2.5 py-1 rounded-full text-[11px] font-sans transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
             viewportMode === 'galaxy_3d'
               ? 'bg-gradient-to-r from-[#D4AF37] to-[#FFD76A] text-[#030712] font-semibold shadow-[0_0_12px_rgba(212,175,55,0.4)]'
@@ -134,6 +138,7 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
         <button
           type="button"
           onClick={() => setViewportMode('youtube_player')}
+          aria-pressed={viewportMode === 'youtube_player'}
           className={`px-2.5 py-1 rounded-full text-[11px] font-sans transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
             viewportMode === 'youtube_player'
               ? 'bg-red-600 text-white font-semibold shadow-[0_0_12px_rgba(239,68,68,0.5)]'
@@ -164,27 +169,20 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
       </div>
 
       {/* Main Center Stage Viewport */}
-      <div className="w-full h-full flex-1 relative overflow-hidden rounded-2xl flex flex-col items-center justify-between">
+      <div className="stage-viewport">
         {viewportMode === 'golden_core' && (
-          <div className="w-full h-full flex flex-col items-center justify-between relative px-4 py-2">
+          <div className="core-scene">
             {/* Core & Space Atmosphere Container */}
-            <div className="flex-1 w-full min-h-0 flex items-center justify-center relative">
+            <div className="core-artwork">
               <GoldenAICore
                 state={avatarState}
                 size={440}
-                onCoreClick={() => {
-                  // Interactive manual click cycles to LISTENING or IDLE
-                  if (avatarState === 'IDLE') {
-                    onAvatarStateChange('LISTENING');
-                  } else {
-                    onAvatarStateChange('IDLE');
-                  }
-                }}
+
               />
             </div>
 
             {/* Bottom Telemetry & Clean Speech Readout (Elegant, Uncluttered) */}
-            <div className="w-full max-w-2xl mx-auto flex flex-col items-center gap-2 pb-1 z-20">
+            <div className="core-readout">
               {/* State Status Indicator */}
               <div className="flex items-center gap-2 text-xs tracking-widest font-mono uppercase text-[#D4AF37]/90">
                 <span className={`w-2 h-2 rounded-full ${avatarState === 'SPEAKING' ? 'bg-[#FFD76A] animate-ping' : avatarState === 'LISTENING' ? 'bg-[#FFD76A] animate-pulse' : 'bg-[#D4AF37]'}`} />
@@ -194,7 +192,7 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
               </div>
 
               {/* Speech / Assistant Message Card */}
-              <div className="w-full px-5 py-3 rounded-xl bg-[#030712]/80 backdrop-blur-md border border-[#D4AF37]/25 shadow-[0_0_20px_rgba(212,175,55,0.06)] text-center transition-all duration-300">
+              <div className="assistant-readout" role="status" aria-live="polite">
                 {interimTranscript ? (
                   <div className="flex items-center justify-center gap-2 text-[#FFD76A] text-sm italic font-sans">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#FFD76A] animate-ping" />
@@ -205,7 +203,7 @@ export const CommandCenter: React.FC<CommandCenterProps> = ({
                     {avatarState === 'SPEAKING' && (
                       <Volume2 className="w-4 h-4 text-[#FFD76A] animate-pulse shrink-0" />
                     )}
-                    <p className="max-w-xl truncate">
+                    <p className="assistant-message">
                       {lastAssistantMessage}
                     </p>
                   </div>

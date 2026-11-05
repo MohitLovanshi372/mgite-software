@@ -9,6 +9,7 @@ export type NavigationPageId =
   | 'tasks'
   | 'calendar'
   | 'memory'
+  | 'people'
   | 'tools'
   | 'notifications'
   | 'settings'

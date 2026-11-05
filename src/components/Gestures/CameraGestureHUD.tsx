@@ -262,9 +262,8 @@ export const CameraGestureHUD: React.FC<CameraGestureHUDProps> = ({
                 ref={videoRef}
                 playsInline
                 muted
-                className={`w-full h-full object-cover transform -scale-x-100 ${
-                  isActive ? 'opacity-85' : 'hidden'
-                }`}
+                aria-hidden="true"
+                className="presence-video-hidden"
               />
 
               {/* Skeletal Canvas Overlay */}

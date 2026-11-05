@@ -10,7 +10,7 @@
  * - Full interactive mock state cycle: IDLE -> LISTENING -> THINKING -> EXECUTING -> SPEAKING
  */
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { JarvisTopBar } from './components/Layout/JarvisTopBar.tsx';
 import { JarvisLeftNav } from './components/Layout/JarvisLeftNav.tsx';
 import { JarvisRightSidebar } from './components/Layout/JarvisRightSidebar.tsx';
@@ -22,6 +22,7 @@ import { CommandCenter } from './pages/CommandCenter.tsx';
 import { ChatView } from './pages/ChatView.tsx';
 import { TasksPage } from './pages/Tasks.tsx';
 import { CalendarPage } from './pages/Calendar.tsx';
+import { PeopleMemory } from './pages/PeopleMemory.tsx';
 import { MemoryPage } from './pages/Memory.tsx';
 import { NotificationsPage } from './pages/Notifications.tsx';
 import { GLBStudioPage } from './pages/GLBStudioPage.tsx';
@@ -54,13 +55,28 @@ import {
 } from './types/spaceTheme.ts';
 
 export default function App() {
+  const [backendStatus, setBackendStatus] = useState({ connected: false, cloud: false });
+  useEffect(() => {
+    const controller = new AbortController();
+    const refresh = async () => {
+      try {
+        const response = await fetch('/api/status', { signal: controller.signal });
+        if (!response.ok) throw new Error('Status unavailable');
+        const status = await response.json();
+        if (!controller.signal.aborted) setBackendStatus({ connected: true, cloud: status.cloud_ai_available === true });
+      } catch { if (!controller.signal.aborted) setBackendStatus({ connected: false, cloud: false }); }
+    };
+    void refresh();
+    const timer = setInterval(refresh, 30000);
+    return () => { controller.abort(); clearInterval(timer); };
+  }, []);
   const [activePage, setActivePage] = useState<NavigationPageId>('command_center');
   const [avatarState, setAvatarState] = useState<AIStateMode>('IDLE');
   const [controlledEmote, setControlledEmote] = useState<AvatarEmotion | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState<string>('');
   const [lastAssistantMessage, setLastAssistantMessage] = useState<string>(
-    'JARVIS online. System vitals and 3D humanoid avatar ready. Standing by for commands.'
+    'A fresh perspective, a little inspiration, or help with your next task. What’s on your mind?'
   );
   const [currentTaskTitle, setCurrentTaskTitle] = useState<string>('System Standby');
 
@@ -381,7 +397,7 @@ export default function App() {
   React.useEffect(() => {
     pushToTalkService.initKeyListeners();
     const unsubscribePTT = pushToTalkService.subscribe((isHolding) => {
-      if (pushToTalkService.isPushToTalkEnabled()) {
+      if (activePage !== 'people' && pushToTalkService.isPushToTalkEnabled()) {
         if (isHolding) {
           handleToggleListening(true);
         } else {
@@ -393,7 +409,7 @@ export default function App() {
     return () => {
       unsubscribePTT();
     };
-  }, [handleToggleListening]);
+  }, [handleToggleListening, activePage]);
 
   const handleSecurityAlert = () => {
     if (avatarState === 'SECURITY_ALERT') {
@@ -477,6 +493,8 @@ export default function App() {
         return <TasksPage />;
       case 'calendar':
         return <CalendarPage />;
+      case 'people':
+        return null;
       case 'memory':
         return <MemoryPage />;
       case 'tools':
@@ -563,7 +581,7 @@ export default function App() {
   return (
     <div
       id="jarvis-desktop-app"
-      className="flex flex-col h-screen w-screen overflow-hidden bg-[#030712] text-[#E8EAF0] font-sans select-none relative"
+      className="jarvis-workspace"
     >
       {/* 0. Immersive Golden Space Starfield Backdrop */}
       {spaceThemeEnabled && (
@@ -578,11 +596,11 @@ export default function App() {
       <JarvisTopBar
         onSettingsClick={() => setActivePage('settings')}
         onProfileClick={() => setActivePage('command_center')}
-        isOnline={true}
+        isOnline={backendStatus.connected}
       />
 
       {/* 2. Main Three-Column Desktop Workspace (Left Nav + Center Stage + Right Sidebar) */}
-      <div className="flex-1 flex min-h-0 overflow-hidden px-4 pb-3 pt-2 gap-3.5 relative z-10">
+      <div className="workspace-body">
         {/* Left Vertical Navigation */}
         <JarvisLeftNav
           activePage={activePage}
@@ -594,17 +612,30 @@ export default function App() {
         />
 
         {/* Center Main Stage Column (Avatar Stage + Voice Cards + Bottom Command Area) */}
-        <main className="flex-1 min-w-0 flex flex-col h-full gap-2.5 relative">
+        <main className="workspace-main">
+          <PeopleMemory
+            visible={activePage === 'people'}
+            busy={isListening || ['THINKING', 'EXECUTING', 'SPEAKING', 'LISTENING'].includes(avatarState)}
+            onOpenPeople={() => setActivePage('people')}
+            onBeforeListen={() => {
+              isAutoSpeechActiveRef.current = false;
+              setIsAutoSpeechActive(false);
+              handleToggleListening(false);
+            }}
+            onSpeakingChange={(speaking) => handleStateChange(speaking ? 'SPEAKING' : 'IDLE')}
+            onGreeting={setLastAssistantMessage}
+            onConversation={triggerAICycle}
+          />
           {/* Dedicated Center Stage View Area */}
-          <div className="flex-1 min-h-0 relative overflow-hidden">
+          {activePage !== 'people' && <div className="workspace-page">
             {renderActivePage()}
-          </div>
+          </div>}
 
+          {activePage !== 'people' && <>
           {/* Voice State Cards (Listening, Thinking, Speaking, Completed) */}
           <div className="shrink-0">
             <JarvisVoiceStateCards
               currentState={avatarState}
-              onSelectState={handleStateChange}
             />
           </div>
 
@@ -618,13 +649,14 @@ export default function App() {
               isSpeaking={avatarState === 'SPEAKING'}
             />
           </div>
+          </>}
         </main>
 
         {/* Right Intelligence Sidebar (System Status, Current Task, Security, Quick Actions) */}
         <JarvisRightSidebar
           currentTaskTitle={currentTaskTitle}
           isTaskRunning={avatarState === 'THINKING' || avatarState === 'EXECUTING'}
-          geminiConnected={true}
+          geminiConnected={backendStatus.cloud}
           voiceReady={true}
           ttsReady={true}
           onVoicePersonaChange={(persona) => ultronVoice.setVoicePersona(persona)}

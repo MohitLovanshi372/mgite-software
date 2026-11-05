@@ -17,6 +17,7 @@ import {
   DetectedVoiceLanguage,
   PronunciationResult,
 } from './pronunciationEngine.ts';
+import { sampleSpeechAnimation, SpeechAnimationFrame } from '../avatar/speechAnimation.ts';
 import { audioEchoGuard } from './audioEchoGuard.ts';
 import { SpeechTextNormalizer, SpeechNormalizationResult } from './speechTextNormalizer.ts';
 
@@ -88,12 +89,18 @@ export const JARVIS_VOICE_PERSONAS: Record<JarvisVoicePersona, VoicePersonaConfi
   },
 };
 
-class UltronVoiceEngine {
+export class UltronVoiceEngine {
   private synth: SpeechSynthesis | null = null;
   private audioCtx: AudioContext | null = null;
   private voice: SpeechSynthesisVoice | null = null;
   private customVoiceURI: string | null = null;
   private isSpeaking: boolean = false;
+  private speechGeneration = 0;
+  private speechStartedAt = 0;
+  private speechText = '';
+  private speechBoundary: { index: number; at: number } | null = null;
+  private speechSamples: Float32Array<ArrayBuffer> | null = null;
+  private synthesisAbortController: AbortController | null = null;
   private subBassOsc: OscillatorNode | null = null;
   private subBassGain: GainNode | null = null;
 
@@ -293,6 +300,7 @@ class UltronVoiceEngine {
   }
 
   private startSpeechPlayback(options?: VoiceSpeakOptions) {
+    this.beginSpeechAnimation(this.lastNormalizedText || this.lastOriginalText);
     this.isSpeaking = true;
     audioEchoGuard.onSpeechStart(this.lastNormalizedText || this.lastOriginalText);
     this.playVocalClick('OPEN');
@@ -672,13 +680,20 @@ class UltronVoiceEngine {
    * Synthesize speech via Fish Audio API backend endpoint with active Jarvis persona
    */
   public async speakViaFishAudio(text: string, options?: VoiceSpeakOptions): Promise<boolean> {
-    if (typeof window === 'undefined') return false;
+    if (typeof window === 'undefined' || this.isMuted || !text.trim()) return false;
+    this.stop();
+    const generation = this.speechGeneration;
+    const controller = new AbortController();
+    this.synthesisAbortController = controller;
+    const isCurrent = () => generation === this.speechGeneration && !controller.signal.aborted;
+    let playbackHandled = false;
     try {
       const personaConfig = JARVIS_VOICE_PERSONAS[this.activePersona] || JARVIS_VOICE_PERSONAS.JARVIS_CINEMATIC;
       const effectiveRate = options?.rate ?? personaConfig.defaultRate ?? this.rate;
 
       const res = await fetch('/api/voice/synthesize', {
         method: 'POST',
+        signal: controller.signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text,
@@ -690,8 +705,10 @@ class UltronVoiceEngine {
         }),
       });
 
+      if (!isCurrent()) return false;
       if (res.ok) {
         const data = await res.json();
+        if (!isCurrent()) return false;
         if (data.audioBase64) {
           const audioUri = `data:${data.contentType || 'audio/mpeg'};base64,${data.audioBase64}`;
           const audio = new Audio(audioUri);
@@ -704,7 +721,7 @@ class UltronVoiceEngine {
             if (ctx) {
               const source = ctx.createMediaElementSource(audio);
               const analyser = ctx.createAnalyser();
-              analyser.fftSize = 64;
+              analyser.fftSize = 512;
               analyser.smoothingTimeConstant = 0.8;
               source.connect(analyser);
               analyser.connect(ctx.destination);
@@ -715,29 +732,50 @@ class UltronVoiceEngine {
             // Audio context source already connected or unsupported
           }
 
-          this.isSpeaking = true;
-          audioEchoGuard.onSpeechStart(text);
-          if (options?.onStart) options.onStart();
-
-          audio.onended = () => {
+          const releaseAudio = () => {
+            audio.onended = null;
+            audio.onerror = null;
+            audio.pause();
+            if (this.currentAudioElement === audio) this.currentAudioElement = null;
             this.isSpeaking = false;
-            this.currentAudioElement = null;
             audioEchoGuard.onSpeechEnd();
-            if (options?.onEnd) options.onEnd();
+            this.analyserNode?.disconnect();
+            this.analyserNode = null;
+            this.frequencyDataBuffer = null;
           };
-
-          audio.onerror = () => {
-            this.isSpeaking = false;
-            this.currentAudioElement = null;
-            audioEchoGuard.onSpeechEnd();
+          audio.onended = () => {
+            if (!isCurrent() || playbackHandled) return;
+            playbackHandled = true;
+            releaseAudio();
+            options?.onEnd?.();
+          };
+          const fallback = () => {
+            if (!isCurrent() || playbackHandled) return;
+            playbackHandled = true;
+            releaseAudio();
             this.speakViaWebSpeech(text, options);
           };
+          audio.onerror = fallback;
 
-          await audio.play();
+          try {
+            await audio.play();
+          } catch (_) {
+            fallback();
+            return true; // Fallback has already been dispatched once.
+          }
+          if (!isCurrent() || playbackHandled) return true;
+          this.isSpeaking = true;
+          this.beginSpeechAnimation(text);
+          audioEchoGuard.onSpeechStart(text);
+          options?.onStart?.();
           return true;
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      // A cancelled request must never start fallback playback.
+    } finally {
+      if (this.synthesisAbortController === controller) this.synthesisAbortController = null;
+    }
     return false;
   }
 
@@ -750,22 +788,28 @@ class UltronVoiceEngine {
     options?: VoiceSpeakOptions
   ) {
     if (this.isMuted || !text.trim()) {
+      this.stop();
+      const generation = this.speechGeneration;
       if (options?.onStart) options.onStart();
       setTimeout(() => {
+        if (generation !== this.speechGeneration) return;
         if (options?.onEnd) options.onEnd();
       }, 1000);
       return;
     }
 
-    // Attempt Fish Audio TTS API first
-    this.speakViaFishAudio(text, options)
+    // The provider starts a new generation synchronously before its first await.
+    const playback = this.speakViaFishAudio(text, options);
+    const generation = this.speechGeneration;
+    playback
       .then((played) => {
-        if (!played) {
+        if (!played && generation === this.speechGeneration) {
           // Fallback to local Jarvis Hindi / Indian speech synthesis
           this.speakViaWebSpeech(text, options);
         }
       })
       .catch(() => {
+        if (generation !== this.speechGeneration) return;
         this.speakViaWebSpeech(text, options);
       });
   }
@@ -777,9 +821,12 @@ class UltronVoiceEngine {
     text: string,
     options?: VoiceSpeakOptions
   ) {
+    this.stop();
+    const generation = this.speechGeneration;
     if (!this.synth || this.isMuted || !text.trim()) {
       if (options?.onStart) options.onStart();
       setTimeout(() => {
+        if (generation !== this.speechGeneration) return;
         if (options?.onEnd) options.onEnd();
       }, 1200);
       return;
@@ -850,7 +897,9 @@ class UltronVoiceEngine {
     utterance.volume = options?.volume !== undefined ? options.volume : this.volume;
 
     utterance.onstart = () => {
+      if (generation !== this.speechGeneration) return;
       this.isSpeaking = true;
+      this.beginSpeechAnimation(textToSpeak);
       audioEchoGuard.onSpeechStart(textToSpeak);
       this.playVocalClick('OPEN');
       if (this.activePersona === 'BIG_BOSS_POWERFUL') {
@@ -859,7 +908,12 @@ class UltronVoiceEngine {
       if (options?.onStart) options.onStart();
     };
 
+    utterance.onboundary = (event) => {
+      if (generation !== this.speechGeneration) return;
+      this.speechBoundary = { index: event.charIndex, at: performance.now() };
+    };
     utterance.onend = () => {
+      if (generation !== this.speechGeneration) return;
       this.isSpeaking = false;
       audioEchoGuard.onSpeechEnd();
       this.stopSubBassResonance();
@@ -868,6 +922,7 @@ class UltronVoiceEngine {
     };
 
     utterance.onerror = () => {
+      if (generation !== this.speechGeneration) return;
       this.isSpeaking = false;
       audioEchoGuard.onSpeechEnd();
       this.stopSubBassResonance();
@@ -924,14 +979,24 @@ class UltronVoiceEngine {
    * Cancels current active speech, streaming, or playback immediately
    */
   public stop() {
+    // Invalidate asynchronous responses and browser callbacks before cancellation.
+    this.speechGeneration++;
+    this.synthesisAbortController?.abort();
+    this.synthesisAbortController = null;
     // 1. Pause and reset active HTML5 audio element
     if (this.currentAudioElement) {
       try {
+        this.currentAudioElement.onended = null;
+        this.currentAudioElement.onerror = null;
         this.currentAudioElement.pause();
         this.currentAudioElement.currentTime = 0;
       } catch (_) {}
       this.currentAudioElement = null;
     }
+
+    this.analyserNode?.disconnect();
+    this.analyserNode = null;
+    this.frequencyDataBuffer = null;
 
     // 2. Cancel WebSocket streaming requests
     if (this.currentStreamRequestId && this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -961,6 +1026,32 @@ class UltronVoiceEngine {
   /**
    * Returns whether Ultron is actively speaking
    */
+  private beginSpeechAnimation(text: string) {
+    this.speechText = text;
+    this.speechStartedAt = performance.now();
+    this.speechBoundary = null;
+  }
+
+  /** Uses the existing playback analyser: never creates a second audio source. */
+  public getSpeechAnimationFrame(): SpeechAnimationFrame {
+    let amplitude: number | undefined;
+    if (this.isSpeaking && this.analyserNode) {
+      if (this.speechSamples?.length !== this.analyserNode.fftSize) {
+        this.speechSamples = new Float32Array(this.analyserNode.fftSize);
+      }
+      this.analyserNode.getFloatTimeDomainData(this.speechSamples);
+      amplitude = Math.sqrt(this.speechSamples.reduce((sum, sample) => sum + sample * sample, 0) / this.speechSamples.length);
+    }
+    const now = performance.now();
+    const charIndex = this.speechBoundary
+      ? this.speechBoundary.index + Math.floor((now - this.speechBoundary.at) / 1000 * 13)
+      : undefined;
+    return sampleSpeechAnimation({ speaking: this.isSpeaking, elapsed: (now - this.speechStartedAt) / 1000,
+      text: this.speechText, charIndex, amplitude });
+  }
+
+  public getPlaybackId(): number { return this.speechGeneration; }
+
   public getSpeakingStatus(): boolean {
     return this.isSpeaking;
   }
