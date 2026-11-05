@@ -1,0 +1,12 @@
+{
+  "source": "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/a86f011d72124e5fb93e59d5c4ab98f699dd5c9c/",
+  "sha256": {
+    "tiny_face_detector_model-weights_manifest.json": "14c60659a31b6b7b1320077171b8f8adcb24ef0e62dde62ce603bcb49a1b49b5",
+    "tiny_face_detector_model-shard1": "b7503ce7df31039b1c43316a9b865cab6a70dd748cc602d3fa28b551503c3871",
+    "face_landmark_68_tiny_model-weights_manifest.json": "3c63b8984302c187b218d9ef5aa149ed8c2c7fa3fe54db078614692bc48d153c",
+    "face_landmark_68_tiny_model-shard1": "b98e9f2f7da76f8a6dda9741a36ed485b224b889d552de2b2c1bb16217f67bfc",
+    "face_recognition_model-weights_manifest.json": "6619f4126f845c1f7857f39cbd79565f375734f46e0dd25d9602f8dc21cda9f5",
+    "face_recognition_model-shard1": "412566a2b8d814d84c60b8055ec5d3b3b2328ef7cd7853384e03ec3db7b053d8",
+    "face_recognition_model-shard2": "69350fdecd845c532e44dd8f7d0521c773505ef46b87cc34f46640a0cc334ecc"
+  }
+}
